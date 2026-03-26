@@ -1,47 +1,34 @@
 "use client";
 
+import axios from "axios";
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type AuthUser = { id: number; email: string; name: string; role: "user" | "admin" };
-type MockStat = { label: string; value: string; change: string };
+type DailyRow = { date: string; count: number };
+type MonthlyRow = { month: string; count: number };
+type AdminOverview = {
+  totalUsers: number;
+  todayVisitors: number;
+  dailySignups: DailyRow[];
+  monthlySignups: MonthlyRow[];
+  dailyVisitors: DailyRow[];
+  monthlyVisitors: MonthlyRow[];
+};
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
 
-const MOCK_DASHBOARD_STATS: MockStat[] = [
-  { label: "오늘 페이지 접속자", value: "1,284", change: "+12.4%" },
-  { label: "문제집 평균 정답률", value: "68.2%", change: "+3.1%p" },
-  { label: "문항 평균 정답률", value: "64.7%", change: "+1.8%p" },
-  { label: "문제집 풀이 시도 횟수", value: "3,942", change: "+9.7%" },
-];
-
-const MOCK_WORKBOOK_ACCURACY = [
-  { name: "SAA 기출 01", accuracy: 72 },
-  { name: "DVA 기출 02", accuracy: 61 },
-  { name: "SAP 기출 01", accuracy: 55 },
-];
-
-const MOCK_QUESTION_ACCURACY = [
-  { no: 3, title: "EC2 Auto Scaling", accuracy: 48 },
-  { no: 7, title: "S3 수명주기 정책", accuracy: 52 },
-  { no: 12, title: "RDS 백업 전략", accuracy: 57 },
-];
-
-const MOCK_VISITOR_TREND = [720, 810, 760, 940, 1020, 980, 1284];
-const MOCK_CATEGORY_RATIO = [
-  { name: "컴퓨팅", ratio: 42, color: "#38bdf8" },
-  { name: "스토리지", ratio: 33, color: "#22c55e" },
-  { name: "네트워크", ratio: 15, color: "#f59e0b" },
-  { name: "보안", ratio: 10, color: "#f43f5e" },
-];
-
 export default function AdminDashboardPage() {
   const isHydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState("");
 
   const auth = (() => {
-    if (!isHydrated || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    if (!isHydrated || !API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
       return { token: null as string | null, user: null as AuthUser | null };
     }
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -53,9 +40,56 @@ export default function AdminDashboardPage() {
       return { token: null, user: null };
     }
   })();
+  const authRole = auth.user?.role ?? null;
+
+  useEffect(() => {
+    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    setLoadingStats(true);
+    setStatsError("");
+    void (async () => {
+      try {
+        const { data } = await axios.get<AdminOverview>(`${API_BASE_URL}/admin/stats/overview`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        setOverview(data);
+      } catch (err) {
+        const message = axios.isAxiosError(err)
+          ? (Array.isArray(err.response?.data?.message)
+              ? err.response?.data?.message.join(", ")
+              : err.response?.data?.message) ?? err.message
+          : "통계를 불러오지 못했습니다.";
+        setStatsError(message || "통계를 불러오지 못했습니다.");
+        setOverview(null);
+      } finally {
+        setLoadingStats(false);
+      }
+    })();
+  }, [auth.token, authRole]);
+
+  const buildLinePoints = (values: number[]) => {
+    if (values.length === 0) return "";
+    if (values.length === 1) return `0,70 300,70`;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return values
+      .map((value, idx) => {
+        const x = (idx / (values.length - 1)) * 300;
+        const y = 110 - ((value - min) / (max - min || 1)) * 90;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  };
 
   if (!isHydrated) {
     return <main className="flex flex-1 items-center justify-center text-neutral-300">확인 중...</main>;
+  }
+
+  if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    return (
+      <main className="flex flex-1 items-center justify-center text-neutral-300">
+        환경변수 설정을 확인해주세요.
+      </main>
+    );
   }
 
   if (!auth.token || !auth.user || auth.user.role !== "admin") {
@@ -97,86 +131,87 @@ export default function AdminDashboardPage() {
       <section className="flex-1 p-6">
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {MOCK_DASHBOARD_STATS.map((stat) => (
-              <article key={stat.label} className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
-                <p className="text-xs text-neutral-400">{stat.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-neutral-100">{stat.value}</p>
-                <p className="mt-1 text-xs text-emerald-400">{stat.change}</p>
-              </article>
-            ))}
+            <article className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+              <p className="text-xs text-neutral-400">총 가입자수</p>
+              <p className="mt-2 text-2xl font-semibold text-neutral-100">{overview?.totalUsers ?? "-"}</p>
+            </article>
+            <article className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+              <p className="text-xs text-neutral-400">오늘 접속자수</p>
+              <p className="mt-2 text-2xl font-semibold text-neutral-100">
+                {overview?.todayVisitors ?? "-"}
+              </p>
+            </article>
+            <article className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+              <p className="text-xs text-neutral-400">최근 일자별 가입자(30일)</p>
+              <p className="mt-2 text-2xl font-semibold text-neutral-100">
+                {overview?.dailySignups?.reduce((acc, cur) => acc + cur.count, 0) ?? "-"}
+              </p>
+            </article>
+            <article className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+              <p className="text-xs text-neutral-400">최근 월자별 가입자(12개월)</p>
+              <p className="mt-2 text-2xl font-semibold text-neutral-100">
+                {overview?.monthlySignups?.reduce((acc, cur) => acc + cur.count, 0) ?? "-"}
+              </p>
+            </article>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
-              <h2 className="text-sm font-semibold">일주일 접속자 추이(가상)</h2>
-              <svg viewBox="0 0 300 120" className="mt-3 h-40 w-full">
+              <h2 className="text-sm font-semibold">일자별 접속자수 (최근 30일)</h2>
+              <svg viewBox="0 0 300 120" className="mt-3 h-44 w-full">
                 <polyline
                   fill="none"
                   stroke="#38bdf8"
                   strokeWidth="3"
-                  points={MOCK_VISITOR_TREND.map((value, idx) => {
-                    const x = (idx / (MOCK_VISITOR_TREND.length - 1)) * 300;
-                    const min = Math.min(...MOCK_VISITOR_TREND);
-                    const max = Math.max(...MOCK_VISITOR_TREND);
-                    const y = 110 - ((value - min) / (max - min || 1)) * 90;
-                    return `${x},${y}`;
-                  }).join(" ")}
+                  points={buildLinePoints((overview?.dailyVisitors ?? []).map((row) => row.count))}
                 />
               </svg>
+              <p className="mt-2 text-xs text-neutral-400">
+                최근값: {overview?.dailyVisitors?.[overview.dailyVisitors.length - 1]?.count ?? 0}명
+              </p>
             </section>
 
             <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
-              <h2 className="text-sm font-semibold">문제 유형 비중(가상)</h2>
-              <div className="mt-3 flex items-center gap-4">
-                <div
-                  className="h-32 w-32 rounded-full"
-                  style={{
-                    background: `conic-gradient(
-                      ${MOCK_CATEGORY_RATIO[0].color} 0 ${MOCK_CATEGORY_RATIO[0].ratio}%,
-                      ${MOCK_CATEGORY_RATIO[1].color} ${MOCK_CATEGORY_RATIO[0].ratio}% ${MOCK_CATEGORY_RATIO[0].ratio + MOCK_CATEGORY_RATIO[1].ratio}%,
-                      ${MOCK_CATEGORY_RATIO[2].color} ${MOCK_CATEGORY_RATIO[0].ratio + MOCK_CATEGORY_RATIO[1].ratio}% ${MOCK_CATEGORY_RATIO[0].ratio + MOCK_CATEGORY_RATIO[1].ratio + MOCK_CATEGORY_RATIO[2].ratio}%,
-                      ${MOCK_CATEGORY_RATIO[3].color} ${MOCK_CATEGORY_RATIO[0].ratio + MOCK_CATEGORY_RATIO[1].ratio + MOCK_CATEGORY_RATIO[2].ratio}% 100%
-                    )`,
-                  }}
-                />
-                <ul className="space-y-1 text-sm">
-                  {MOCK_CATEGORY_RATIO.map((item) => (
-                    <li key={item.name}>
-                      {item.name} {item.ratio}%
-                    </li>
-                  ))}
-                </ul>
+              <h2 className="text-sm font-semibold">월자별 접속자수 (최근 12개월)</h2>
+              <div className="mt-3 grid grid-cols-6 gap-2">
+                {(overview?.monthlyVisitors ?? []).slice(-6).map((row) => (
+                  <div key={row.month} className="rounded bg-black/40 px-2 py-2 text-center">
+                    <p className="text-[11px] text-neutral-500">{row.month.slice(5)}</p>
+                    <p className="mt-1 text-xs text-neutral-200">{row.count}</p>
+                  </div>
+                ))}
               </div>
             </section>
 
             <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
-              <h2 className="text-sm font-semibold">문제집 정답률(가상)</h2>
-              <ul className="mt-3 space-y-2">
-                {MOCK_WORKBOOK_ACCURACY.map((item) => (
-                  <li key={item.name}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span>{item.name}</span>
-                      <span>{item.accuracy}%</span>
-                    </div>
-                    <div className="h-2 rounded bg-neutral-800">
-                      <div className="h-2 rounded bg-sky-500" style={{ width: `${item.accuracy}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <h2 className="text-sm font-semibold">일자별 가입자수 (최근 30일)</h2>
+              <svg viewBox="0 0 300 120" className="mt-3 h-44 w-full">
+                <polyline
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="3"
+                  points={buildLinePoints((overview?.dailySignups ?? []).map((row) => row.count))}
+                />
+              </svg>
+              <p className="mt-2 text-xs text-neutral-400">
+                최근값: {overview?.dailySignups?.[overview.dailySignups.length - 1]?.count ?? 0}명
+              </p>
             </section>
 
             <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
-              <h2 className="text-sm font-semibold">문항 정답률 하위(가상)</h2>
-              <ul className="mt-3 space-y-2 text-sm">
-                {MOCK_QUESTION_ACCURACY.map((item) => (
-                  <li key={item.no} className="rounded-md border border-neutral-700 bg-black/40 px-3 py-2">
-                    {item.no}번 - {item.title} / 정답률 {item.accuracy}%
-                  </li>
+              <h2 className="text-sm font-semibold">월자별 가입자수 (최근 12개월)</h2>
+              <div className="mt-3 grid grid-cols-6 gap-2">
+                {(overview?.monthlySignups ?? []).slice(-6).map((row) => (
+                  <div key={row.month} className="rounded bg-black/40 px-2 py-2 text-center">
+                    <p className="text-[11px] text-neutral-500">{row.month.slice(5)}</p>
+                    <p className="mt-1 text-xs text-neutral-200">{row.count}</p>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </section>
           </div>
+          {loadingStats ? <p className="text-sm text-neutral-400">통계 불러오는 중...</p> : null}
+          {statsError ? <p className="text-sm text-rose-400">{statsError}</p> : null}
         </div>
       </section>
     </main>

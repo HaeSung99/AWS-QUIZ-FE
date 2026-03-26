@@ -3,7 +3,7 @@
 import axios from "axios";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
@@ -38,7 +38,7 @@ function getAuthTokenSnapshot() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export default function QuizPage() {
+function QuizPageContent() {
   const searchParams = useSearchParams();
   const workbookId = searchParams.get("workbookId") ?? "";
   const token = useSyncExternalStore(subscribeAuthToken, getAuthTokenSnapshot, () => null);
@@ -95,6 +95,14 @@ export default function QuizPage() {
     setResultItems(items);
     setResult({ score, total });
     setSubmitted(true);
+
+    try {
+      await axios.post(
+        `${API_BASE_URL}/auth/me/workbook-attempts`,
+        { workbookId, correctCount: score, totalCount: total },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+    } catch {}
 
     try {
       const { data } = await axios.post<{ solvedWorkbookIds: string[] }>(
@@ -280,5 +288,19 @@ export default function QuizPage() {
         </Link>
       </div>
     </main>
+  );
+}
+
+export default function QuizPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-black text-neutral-100 flex flex-col items-center justify-center px-4">
+          <p className="text-neutral-400">퀴즈 화면 준비 중...</p>
+        </main>
+      }
+    >
+      <QuizPageContent />
+    </Suspense>
   );
 }

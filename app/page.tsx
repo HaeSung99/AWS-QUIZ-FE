@@ -9,17 +9,8 @@ const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const NOTICE_HOME_MAX = 4;
 const SITE_CERT_GUIDE = {
-  title: "AWS 자격증 가이드",
-  articles: [
-    { id: "saa-s3", label: "AWS SAA S3 총 정리", href: "/guide/saa-s3" },
-    { id: "saa-vpc", label: "SAA VPC·네트워킹 핵심 정리", href: "/guide/saa-vpc" },
-    { id: "dva-lambda", label: "DVA Lambda·이벤트 기반 설계", href: "/guide/dva-lambda" },
-    {
-      id: "sap-well-architected",
-      label: "SAP Well-Architected 요약",
-      href: "/guide/sap-well-architected",
-    },
-  ],
+  title: "AWS 자격증 가이드 준비중",
+  articles: [ {id: "준비중", label: "준비중", href: "/"}],
   officialDocs: {
     label: "AWS 공식 문서",
     href: "https://docs.aws.amazon.com/",
@@ -32,6 +23,12 @@ type WorkbookItem = {
   certificationType: string;
   title: string;
   summary: string;
+};
+type WorkbookAccuracyItem = {
+  workbookId: string;
+  title: string;
+  accuracy: number;
+  attemptCount: number;
 };
 type StoredUser = {
   id: number;
@@ -48,6 +45,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [noticeItems, setNoticeItems] = useState<NoticeItem[]>([]);
   const [workbookItems, setWorkbookItems] = useState<WorkbookItem[]>([]);
+  const [workbookAccuracyMap, setWorkbookAccuracyMap] = useState<Record<string, number>>({});
   const [solvedWorkbookIds, setSolvedWorkbookIds] = useState<string[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -73,6 +71,42 @@ export default function Home() {
         setWorkbookItems([]);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    if (!API_BASE_URL) return;
+    void (async () => {
+      try {
+        const { data } = await axios.get<WorkbookAccuracyItem[]>(
+          `${API_BASE_URL}/public/workbooks/accuracy`,
+        );
+        if (!Array.isArray(data)) {
+          setWorkbookAccuracyMap({});
+          return;
+        }
+        const map: Record<string, number> = {};
+        for (const row of data) {
+          map[row.workbookId] = row.accuracy;
+        }
+        setWorkbookAccuracyMap(map);
+      } catch {
+        setWorkbookAccuracyMap({});
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!API_BASE_URL || typeof window === "undefined") return;
+    const saved = localStorage.getItem("aws_quiz_visit_key");
+    const clientKey =
+      saved ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
+    if (!saved) {
+      localStorage.setItem("aws_quiz_visit_key", clientKey);
+    }
+    void axios.post(`${API_BASE_URL}/public/track-visit`, { clientKey }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -242,6 +276,12 @@ export default function Home() {
                             </p>
                             <p className="mt-0.5 line-clamp-1 text-xs text-neutral-500">
                               {workbook.summary}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-sky-300/90">
+                              문제집 평균 정답률:{" "}
+                              {typeof workbookAccuracyMap[workbook.id] === "number"
+                                ? `${workbookAccuracyMap[workbook.id].toFixed(1)}%`
+                                : "-"}
                             </p>
                           </div>
                           <Link
