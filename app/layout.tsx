@@ -4,8 +4,28 @@ import "./globals.css";
 import { HeaderAuth } from "@/components/header-auth";
 
 export const metadata: Metadata = {
-  title: "AWS 문제 풀이 사이트",
-  description: "AWS 문제 풀이 사이트",
+  metadataBase: new URL("https://awsquizkr.com"),
+  title: "AWS Quiz KR - AWS 자격증 준비를 위한 실전 퀴즈",
+  description:
+    "AWS 자격증(SAA, CLF 등) 합격을 위한 한국어 퀴즈 서비스입니다. 지금 바로 문제를 풀고 실력을 점검하세요!",
+  openGraph: {
+    title: "AWS Quiz KR",
+    description: "AWS 자격증 준비는 여기서!",
+    url: "https://awsquizkr.com",
+    siteName: "AWS Quiz KR",
+    locale: "ko_KR",
+    type: "website",
+    images: [
+      {
+        url: "https://awsquizkr.com/logo.png",
+      },
+    ],
+  },
+  verification: {
+    other: {
+      "naver-site-verification": "5d2a1342267a275219e51b8bacc43f58feef2caf",
+    },
+  },
 };
 
 export default function RootLayout({
