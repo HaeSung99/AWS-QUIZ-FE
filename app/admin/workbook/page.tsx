@@ -58,8 +58,8 @@ export default function AdminWorkbookPage() {
   const [choiceValues, setChoiceValues] = useState<string[]>(["", "", "", ""]);
   const [answerNumber, setAnswerNumber] = useState("");
   const [hint, setHint] = useState("");
-  const [difficulty, setDifficulty] = useState("중");
-  const [questionCategory, setQuestionCategory] = useState("컴퓨팅");
+  const [difficulty, setDifficulty] = useState("");
+  const [questionCategory, setQuestionCategory] = useState("");
   const [editingItemId, setEditingItemId] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -105,8 +105,8 @@ export default function AdminWorkbookPage() {
     setChoiceValues(["", "", "", ""]);
     setAnswerNumber("");
     setHint("");
-    setDifficulty("중");
-    setQuestionCategory("컴퓨팅");
+    setDifficulty("");
+    setQuestionCategory("");
     setEditingItemId("");
   };
 
@@ -251,6 +251,17 @@ export default function AdminWorkbookPage() {
       setMessageTone("error");
       return;
     }
+    if (!difficulty) {
+      setMessage("난이도를 선택해주세요.");
+      setMessageTone("error");
+      return;
+    }
+    const trimmedQuestionCategory = questionCategory.trim();
+    if (!trimmedQuestionCategory) {
+      setMessage("문제 종류를 입력해주세요.");
+      setMessageTone("error");
+      return;
+    }
 
     setMessage("");
     setMessageTone("info");
@@ -263,7 +274,7 @@ export default function AdminWorkbookPage() {
         answer: choices[answerIndex],
         hint,
         difficulty,
-        questionCategory,
+        questionCategory: trimmedQuestionCategory,
       };
       if (editingItemId) {
         await axios.patch(
@@ -675,14 +686,17 @@ export default function AdminWorkbookPage() {
                       <p className="text-[11px] text-neutral-500">
                         정답 선택은 "번호 - 보기 내용"을 확인하고 선택하세요.
                       </p>
-                      <input
-                        type="text"
+                      <select
                         value={difficulty}
                         onChange={(e) => setDifficulty(e.target.value)}
-                        placeholder="난이도 (상/중/하)"
                         className="rounded-md border border-neutral-700 bg-black px-3 py-2 text-sm"
                         required
-                      />
+                      >
+                        <option value="">난이도 선택</option>
+                        <option value="상">상</option>
+                        <option value="중">중</option>
+                        <option value="하">하</option>
+                      </select>
                     </div>
                     <input
                       type="text"

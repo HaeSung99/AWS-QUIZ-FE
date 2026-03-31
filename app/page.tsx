@@ -8,9 +8,22 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const NOTICE_HOME_MAX = 4;
+const OPEN_CHAT_URL = "https://open.kakao.com/o/spyj5doi";
+const CONTACT_EMAIL = "inseok1999@gmail.com";
 const SITE_CERT_GUIDE = {
-  title: "AWS 자격증 가이드 준비중",
-  articles: [ {id: "준비중", label: "준비중", href: "/"}],
+  title: "AWS 자격증 가이드",
+  groups: [
+    {
+      cert: "SAA-C03",
+      note: "참고용 가이드",
+      href: "/guide/saa-c03",
+    },
+    {
+      cert: "CLF-C02",
+      note: "준비중입니다.",
+      href: "/guide/clf-c02",
+    },
+  ],
   officialDocs: {
     label: "AWS 공식 문서",
     href: "https://docs.aws.amazon.com/",
@@ -48,6 +61,7 @@ export default function Home() {
   const [workbookAccuracyMap, setWorkbookAccuracyMap] = useState<Record<string, number>>({});
   const [solvedWorkbookIds, setSolvedWorkbookIds] = useState<string[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [copyMessage, setCopyMessage] = useState("");
 
   useEffect(() => {
     if (!API_BASE_URL) return;
@@ -167,9 +181,46 @@ export default function Home() {
     return shuffled.slice(0, 12);
   }, [filteredWorkbooks, search]);
 
+  const onCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL);
+      setCopyMessage("메일 복사 완료!");
+      setTimeout(() => setCopyMessage(""), 2000);
+    } catch {
+      setCopyMessage("메일 복사 실패. 다시 시도해주세요.");
+      setTimeout(() => setCopyMessage(""), 2000);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-black px-4 py-10 text-neutral-100">
       <div className="mx-auto flex w-full max-w-[81rem] flex-col gap-9">
+        <article className="rounded-md border border-amber-700/60 bg-amber-950/20 px-3 py-2.5">
+          <p className="text-xs font-semibold text-amber-200">현재 테스트 버전 안내</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-amber-100/90">
+            현재 테스트 버전이므로 데이터 손실 및 보안 이슈에 유의해주세요. 문의사항, 도움을 줄 수 있는
+            내용, 개선사항, 다양한 조언은 오픈채팅 또는 메일로 전달해주시면 감사하겠습니다.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Link
+              href={OPEN_CHAT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100"
+            >
+              오픈채팅
+            </Link>
+            <button
+              type="button"
+              onClick={() => void onCopyEmail()}
+              className="cursor-pointer rounded border border-neutral-600 bg-black/30 px-2 py-1 text-[11px] text-neutral-200"
+            >
+              메일
+            </button>
+            {copyMessage ? <span className="text-[11px] text-sky-300">{copyMessage}</span> : null}
+          </div>
+        </article>
+
         <div className="w-full">
           <label htmlFor="main-search" className="sr-only">
             문제집 검색
@@ -222,13 +273,15 @@ export default function Home() {
               {SITE_CERT_GUIDE.title}
             </h2>
             <ul className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
-              {SITE_CERT_GUIDE.articles.map((article) => (
-                <li key={article.id}>
+              {SITE_CERT_GUIDE.groups.map((group) => (
+                <li key={group.cert} className="rounded-md border border-neutral-700/70 bg-black/30 px-2 py-2">
+                  <p className="text-xs font-semibold text-neutral-200">{group.cert}</p>
+                  <p className="mt-0.5 text-[11px] text-neutral-500">{group.note}</p>
                   <Link
-                    href={article.href}
-                    className="block rounded-md border border-transparent px-1 py-1 text-sm text-sky-300/90 transition hover:border-neutral-600 hover:bg-neutral-950/50 hover:text-sky-200"
+                    href={group.href}
+                    className="mt-2 inline-flex rounded-md border border-neutral-600 px-2 py-1 text-xs text-sky-300 transition hover:border-sky-500/70 hover:bg-neutral-900 hover:text-sky-200"
                   >
-                    {article.label}
+                    가이드 보러가기 →
                   </Link>
                 </li>
               ))}
