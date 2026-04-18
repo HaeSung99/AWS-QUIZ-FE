@@ -10,8 +10,6 @@ const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const NOTICE_HOME_MAX = 4;
 const OPEN_CHAT_URL = "https://open.kakao.com/o/spyj5doi";
 const CONTACT_EMAIL = "inseok1999@gmail.com";
-/** `public/` 루트에 두는 파일명과 동일하게 맞추세요. */
-const PUBLIC_PPT_FILE = "스위트북 과제.pptx";
 const SITE_CERT_GUIDE = {
   title: "AWS 자격증 가이드",
   groups: [
@@ -219,13 +217,6 @@ export default function Home() {
             >
               메일
             </button>
-            <a
-              href={`/${encodeURIComponent(PUBLIC_PPT_FILE)}`}
-              download={PUBLIC_PPT_FILE}
-              className="rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100"
-            >
-              PPT
-            </a>
             {copyMessage ? <span className="text-[11px] text-sky-300">{copyMessage}</span> : null}
           </div>
         </article>
