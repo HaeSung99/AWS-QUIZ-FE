@@ -482,7 +482,7 @@ export default function AdminWorkbookPage() {
                     <p className="mt-1 line-clamp-2 text-xs text-neutral-400">{workbook.summary}</p>
                     <p className="mt-2 text-[11px] text-sky-300/90">
                       정답률 {accuracy ? `${accuracy.accuracy.toFixed(1)}%` : "-"}
-                      {accuracy ? ` (${accuracy.attemptCount}회)` : ""}
+                      {accuracy ? ` (참여 ${accuracy.attemptCount}명)` : ""}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <button

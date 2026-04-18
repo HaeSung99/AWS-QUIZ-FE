@@ -73,6 +73,8 @@ function QuizPageContent() {
   const [submitted, setSubmitted] = useState(false);
   const [resultItems, setResultItems] = useState<QuizResultItem[]>([]);
   const [infoRevealByQuestion, setInfoRevealByQuestion] = useState<Record<string, QuestionInfoReveal>>({});
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!API_BASE_URL || !workbookId || !token) return;
@@ -124,54 +126,76 @@ function QuizPageContent() {
     });
   };
 
+  const unansweredCount = useMemo(
+    () => questions.reduce((n, q) => (answers[q.id] ? n : n + 1), 0),
+    [questions, answers],
+  );
+
+  useEffect(() => {
+    if (!submitConfirmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) setSubmitConfirmOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [submitConfirmOpen, isSubmitting]);
+
   const onSubmit = async () => {
-    if (!currentQuestion || !API_BASE_URL || !token || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) return;
+    if (!API_BASE_URL || !token || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) return;
     const total = questions.length;
-    const items = questions.map((q) => {
-      const selected = answers[q.id] ?? null;
-      const isCorrect = selected === q.answer;
-      return {
-        questionId: q.id,
-        questionNumber: q.questionNumber,
-        selectedAnswer: selected,
-        correctAnswer: q.answer,
-        isCorrect,
-      };
-    });
-    const score = items.reduce((acc, item) => acc + (item.isCorrect ? 1 : 0), 0);
-    setResultItems(items);
-    setResult({ score, total });
-    setSubmitted(true);
+    if (total === 0) return;
 
+    setIsSubmitting(true);
     try {
-      await axios.post(
-        `${API_BASE_URL}/auth/me/workbook-attempts`,
-        { workbookId, correctCount: score, totalCount: total },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-    } catch {}
-
-    try {
-      const { data } = await axios.post<{ solvedWorkbookIds: string[] }>(
-        `${API_BASE_URL}/auth/me/solved-workbooks/${workbookId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      const rawUser = localStorage.getItem(AUTH_USER_KEY);
-      if (rawUser) {
-        const user = JSON.parse(rawUser) as {
-          id: number;
-          email: string;
-          name: string;
-          role: "user" | "admin";
-          solvedWorkbookIds?: string[];
+      const items = questions.map((q) => {
+        const selected = answers[q.id] ?? null;
+        const isCorrect = selected === q.answer;
+        return {
+          questionId: q.id,
+          questionNumber: q.questionNumber,
+          selectedAnswer: selected,
+          correctAnswer: q.answer,
+          isCorrect,
         };
-        user.solvedWorkbookIds = data.solvedWorkbookIds;
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+      });
+      const score = items.reduce((acc, item) => acc + (item.isCorrect ? 1 : 0), 0);
+      setResultItems(items);
+      setResult({ score, total });
+      setSubmitted(true);
+
+      try {
+        await axios.post(
+          `${API_BASE_URL}/auth/me/workbook-attempts`,
+          { workbookId, correctCount: score, totalCount: total },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+      } catch {}
+
+      try {
+        const { data } = await axios.post<{ solvedWorkbookIds: string[] }>(
+          `${API_BASE_URL}/auth/me/solved-workbooks/${workbookId}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const rawUser = localStorage.getItem(AUTH_USER_KEY);
+        if (rawUser) {
+          const user = JSON.parse(rawUser) as {
+            id: number;
+            email: string;
+            name: string;
+            role: "user" | "admin";
+            solvedWorkbookIds?: string[];
+          };
+          user.solvedWorkbookIds = data.solvedWorkbookIds;
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        }
+        setMessage("채점 완료 및 풀이 완료 저장");
+      } catch {
+        setMessage("채점은 완료됐지만 풀이 완료 저장은 실패");
       }
-      setMessage("채점 완료 및 풀이 완료 저장");
-    } catch {
-      setMessage("채점은 완료됐지만 풀이 완료 저장은 실패");
+    } finally {
+      setIsSubmitting(false);
+      setSubmitConfirmOpen(false);
     }
   };
 
@@ -394,6 +418,62 @@ function QuizPageContent() {
 
             {message ? <p className="mt-2 text-sm text-amber-300">{message}</p> : null}
 
+            {submitConfirmOpen ? (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                role="presentation"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget && !isSubmitting) setSubmitConfirmOpen(false);
+                }}
+              >
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="submit-confirm-title"
+                  className="w-full max-w-md rounded-xl border border-neutral-600 bg-neutral-950 p-5 shadow-2xl ring-1 ring-white/10"
+                >
+                  <h2 id="submit-confirm-title" className="text-lg font-semibold text-neutral-50">
+                    제출 확인
+                  </h2>
+                  <p className="mt-3 text-sm leading-relaxed text-neutral-300">
+                    이대로 제출하시겠습니까? 제출 후에는 채점 결과에서 문제로 돌아가 답을 고칠 수 있지만, 화면에 보이는 점수는{" "}
+                    <span className="font-medium text-neutral-100">이번 제출 시점</span> 기준입니다.
+                  </p>
+                  <p className="mt-3 rounded-lg border border-sky-500/40 bg-sky-950/30 px-3 py-2 text-sm font-medium text-sky-100">
+                    최초 제출만 정답률로 집계됩니다.
+                  </p>
+                  {unansweredCount > 0 ? (
+                    <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/35 px-3 py-2 text-sm text-amber-100">
+                      아직 답하지 않은 문제가 {unansweredCount}개 있습니다. 미응답은 오답으로 채점됩니다.
+                    </p>
+                  ) : null}
+                  <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+                    문제집 통계(평균 정답률)에는{" "}
+                    <span className="text-neutral-400">회원별 이 문제집의 최초 제출 점수만</span> 집계됩니다. 같은
+                    문제집을 다시 제출해도 정답률 통계는 바뀌지 않습니다.
+                  </p>
+                  <div className="mt-5 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => setSubmitConfirmOpen(false)}
+                      className="cursor-pointer rounded-lg border border-neutral-600 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => void onSubmit()}
+                      className="cursor-pointer rounded-lg border-2 border-fuchsia-500/80 bg-fuchsia-950/60 px-4 py-2 text-sm font-semibold text-fuchsia-50 transition hover:border-fuchsia-400 hover:bg-fuchsia-900/70 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSubmitting ? "제출 중…" : "제출하기"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-5 grid grid-cols-3 items-center gap-2">
               <div className="flex justify-start">
                 {currentIndex > 0 ? (
@@ -410,8 +490,8 @@ function QuizPageContent() {
               <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={onSubmit}
-                  disabled={currentIndex !== questions.length - 1}
+                  onClick={() => setSubmitConfirmOpen(true)}
+                  disabled={isSubmitting}
                   className="cursor-pointer rounded-md border border-fuchsia-500/80 bg-fuchsia-950/50 px-4 py-2 text-sm font-medium text-fuchsia-100 transition hover:-translate-y-0.5 hover:border-fuchsia-400 hover:bg-fuchsia-900/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 >
                   제출하기
