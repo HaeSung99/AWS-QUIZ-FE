@@ -352,12 +352,13 @@ function QuizPageContent() {
             <p className="text-xs text-neutral-500">
               {currentIndex + 1} / {questions.length}
             </p>
-            <h1 className="mt-1 text-lg font-semibold">
-              {currentQuestion?.questionNumber}번. {currentQuestion?.questionDescription}
-            </h1>
+            <h1 className="mt-1 text-lg font-semibold">{currentQuestion?.questionNumber}번.</h1>
+            <p className="mt-2 text-base font-normal leading-relaxed text-neutral-200">
+              {currentQuestion?.questionDescription}
+            </p>
 
             {currentQuestion ? (
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => toggleInfoReveal("difficulty")}
@@ -372,29 +373,14 @@ function QuizPageContent() {
                 >
                   {currentInfoReveal.category ? "유형 숨기기" : "유형 보기"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => toggleInfoReveal("hint")}
-                  className="cursor-pointer rounded-md border border-neutral-600 bg-neutral-950/80 px-2.5 py-1 text-[11px] text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-800"
-                >
-                  {currentInfoReveal.hint ? "힌트 숨기기" : "힌트 보기"}
-                </button>
               </div>
             ) : null}
 
             {currentQuestion && currentInfoReveal.difficulty ? (
-              <p className="mt-2 text-xs text-neutral-400">난이도: {currentQuestion.difficulty}</p>
+              <p className="mt-2 text-right text-xs text-neutral-400">난이도: {currentQuestion.difficulty}</p>
             ) : null}
             {currentQuestion && currentInfoReveal.category ? (
-              <p className="mt-1 text-xs text-neutral-400">유형: {currentQuestion.questionCategory}</p>
-            ) : null}
-            {currentQuestion && currentInfoReveal.hint ? (
-              <p className="mt-1 text-xs text-amber-200/90">
-                힌트:{" "}
-                {currentQuestion.hint?.trim()
-                  ? currentQuestion.hint
-                  : "이 문제에는 등록된 힌트가 없습니다."}
-              </p>
+              <p className="mt-1 text-right text-xs text-neutral-400">유형: {currentQuestion.questionCategory}</p>
             ) : null}
 
             <div className="mt-4 flex flex-col gap-2">
@@ -415,6 +401,27 @@ function QuizPageContent() {
                 </button>
               ))}
             </div>
+
+            {currentQuestion ? (
+              <div className="mt-3 flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => toggleInfoReveal("hint")}
+                  className="cursor-pointer rounded-md border border-neutral-600 bg-neutral-950/80 px-2.5 py-1 text-[11px] text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-800"
+                >
+                  {currentInfoReveal.hint ? "힌트 숨기기" : "힌트 보기"}
+                </button>
+              </div>
+            ) : null}
+
+            {currentQuestion && currentInfoReveal.hint ? (
+              <p className="mt-2 text-left text-xs leading-relaxed text-amber-200/90">
+                힌트:{" "}
+                {currentQuestion.hint?.trim()
+                  ? currentQuestion.hint
+                  : "이 문제에는 등록된 힌트가 없습니다."}
+              </p>
+            ) : null}
 
             {message ? <p className="mt-2 text-sm text-amber-300">{message}</p> : null}
 
