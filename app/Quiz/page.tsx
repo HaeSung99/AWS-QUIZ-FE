@@ -27,6 +27,29 @@ type QuizResultItem = {
   isCorrect: boolean;
 };
 
+type QuestionInfoReveal = {
+  difficulty: boolean;
+  category: boolean;
+  hint: boolean;
+};
+
+const defaultReveal: QuestionInfoReveal = {
+  difficulty: false,
+  category: false,
+  hint: false,
+};
+
+function choiceIndexAndText(choices: string[], answer: string | null): { num: number | null; text: string } {
+  if (answer == null || answer === "") {
+    return { num: null, text: "" };
+  }
+  const idx = choices.findIndex((c) => c === answer);
+  if (idx < 0) {
+    return { num: null, text: answer };
+  }
+  return { num: idx + 1, text: answer };
+}
+
 function subscribeAuthToken(onStoreChange: () => void) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("storage", onStoreChange);
@@ -49,6 +72,7 @@ function QuizPageContent() {
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [resultItems, setResultItems] = useState<QuizResultItem[]>([]);
+  const [infoRevealByQuestion, setInfoRevealByQuestion] = useState<Record<string, QuestionInfoReveal>>({});
 
   useEffect(() => {
     if (!API_BASE_URL || !workbookId || !token) return;
@@ -76,6 +100,29 @@ function QuizPageContent() {
     () => (questions.length > 0 ? questions[currentIndex] : null),
     [questions, currentIndex],
   );
+
+  const questionById = useMemo(() => {
+    const m = new Map<string, QuizQuestion>();
+    for (const q of questions) {
+      m.set(q.id, q);
+    }
+    return m;
+  }, [questions]);
+
+  const currentInfoReveal = currentQuestion
+    ? (infoRevealByQuestion[currentQuestion.id] ?? defaultReveal)
+    : defaultReveal;
+
+  const toggleInfoReveal = (field: keyof QuestionInfoReveal) => {
+    if (!currentQuestion) return;
+    setInfoRevealByQuestion((prev) => {
+      const prevRow = prev[currentQuestion.id] ?? defaultReveal;
+      return {
+        ...prev,
+        [currentQuestion.id]: { ...prevRow, [field]: !prevRow[field] },
+      };
+    });
+  };
 
   const onSubmit = async () => {
     if (!currentQuestion || !API_BASE_URL || !token || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) return;
@@ -160,25 +207,29 @@ function QuizPageContent() {
           </div>
         ) : submitted ? (
           <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 p-6">
-            <h1 className="text-lg font-semibold">채점 결과</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-neutral-50">채점 결과</h1>
             {result ? (
-              <p className="mt-2 text-sm text-emerald-300">
-                총점: {result.score} / {result.total}
-              </p>
+              <div className="mt-3 inline-flex min-w-[12rem] items-baseline gap-2 rounded-lg border-2 border-emerald-500/40 bg-emerald-950/40 px-4 py-3">
+                <span className="text-xs font-medium uppercase tracking-wide text-emerald-200/85">총점</span>
+                <span className="text-2xl font-bold tabular-nums text-emerald-100">
+                  {result.score}
+                  <span className="text-base font-semibold text-emerald-300/80"> / {result.total}</span>
+                </span>
+              </div>
             ) : null}
             {message ? <p className="mt-2 text-sm text-amber-300">{message}</p> : null}
 
-            <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6">
+            <div className="mt-4 grid grid-cols-4 gap-2.5 sm:grid-cols-6">
               {resultItems.map((item) => (
                 <button
                   key={item.questionId}
                   type="button"
                   title="클릭하면 해당 문제로 이동"
                   onClick={() => onGoToQuestionFromResult(item.questionId)}
-                  className={`rounded-md border px-2 py-1 text-sm transition ${
+                  className={`rounded-lg border-2 px-2 py-2 text-sm font-medium shadow-sm transition hover:brightness-110 ${
                     item.isCorrect
-                      ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-300"
-                      : "border-rose-500/50 bg-rose-950/30 text-rose-300"
+                      ? "border-emerald-400/70 bg-emerald-950/50 text-emerald-100"
+                      : "border-rose-400/70 bg-rose-950/50 text-rose-100"
                   }`}
                 >
                   {item.questionNumber}번
@@ -186,29 +237,90 @@ function QuizPageContent() {
               ))}
             </div>
 
-            <ul className="mt-5 space-y-2">
-              {resultItems.map((item) => (
-                <li
-                  key={`detail-${item.questionId}`}
-                  className="rounded-md border border-neutral-700 bg-black/40 px-3 py-2 text-sm"
-                >
-                  <p className={item.isCorrect ? "text-emerald-300" : "text-rose-300"}>
-                    {item.questionNumber}번 {item.isCorrect ? "정답" : "오답"}
-                  </p>
-                  <p className="mt-1 text-neutral-400">
-                    내 답: {item.selectedAnswer ?? "미응답"} / 정답: {item.correctAnswer}
-                  </p>
-                  {!item.isCorrect ? (
-                    <button
-                      type="button"
-                      onClick={() => onGoToQuestionFromResult(item.questionId)}
-                      className="mt-2 cursor-pointer rounded-md border border-rose-500/60 bg-rose-950/30 px-2 py-1 text-xs text-rose-200 transition hover:border-rose-400 hover:bg-rose-950/50"
-                    >
-                      해당 문제로 바로가기
-                    </button>
-                  ) : null}
-                </li>
-              ))}
+            <ul className="mt-6 space-y-4">
+              {resultItems.map((item) => {
+                const q = questionById.get(item.questionId);
+                const choices = q?.choices ?? [];
+                const mine = choiceIndexAndText(choices, item.selectedAnswer);
+                const correct = choiceIndexAndText(choices, item.correctAnswer);
+                const mineMissingIdx = item.selectedAnswer != null && item.selectedAnswer !== "" && mine.num == null;
+                const correctMissingIdx =
+                  item.correctAnswer != null && item.correctAnswer !== "" && correct.num == null;
+
+                return (
+                  <li
+                    key={`detail-${item.questionId}`}
+                    className="rounded-xl border border-neutral-600/90 bg-neutral-950/70 p-4 shadow-md ring-1 ring-white/5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p
+                        className={`text-base font-semibold ${
+                          item.isCorrect ? "text-emerald-300" : "text-rose-300"
+                        }`}
+                      >
+                        {item.questionNumber}번 · {item.isCorrect ? "정답" : "오답"}
+                      </p>
+                      {!item.isCorrect ? (
+                        <button
+                          type="button"
+                          onClick={() => onGoToQuestionFromResult(item.questionId)}
+                          className="cursor-pointer rounded-lg border-2 border-rose-400/60 bg-rose-950/40 px-3 py-1.5 text-xs font-medium text-rose-100 transition hover:border-rose-300 hover:bg-rose-900/50"
+                        >
+                          해당 문제로 바로가기
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div
+                        className={`rounded-lg border-2 px-3 py-3 ${
+                          item.isCorrect
+                            ? "border-emerald-500/45 bg-emerald-950/35"
+                            : "border-rose-500/50 bg-rose-950/35"
+                        }`}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-300">
+                          내 응답
+                        </p>
+                        {mine.num == null && (item.selectedAnswer == null || item.selectedAnswer === "") ? (
+                          <p className="mt-2 text-sm font-medium text-neutral-400">미응답</p>
+                        ) : (
+                          <>
+                            <p
+                              className={`mt-2 text-lg font-bold tabular-nums ${
+                                item.isCorrect ? "text-emerald-200" : "text-rose-200"
+                              }`}
+                            >
+                              {mine.num != null ? `${mine.num}번` : "보기 번호 없음"}
+                            </p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-neutral-100">{mine.text}</p>
+                            {mineMissingIdx ? (
+                              <p className="mt-2 text-xs text-amber-200/90">
+                                현재 선택지 목록과 문자열이 일치하지 않습니다. (데이터 불일치 가능)
+                              </p>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border-2 border-emerald-500/50 bg-emerald-950/35 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200/90">
+                          정답
+                        </p>
+                        <p className="mt-2 text-lg font-bold tabular-nums text-emerald-100">
+                          {correct.num != null ? `${correct.num}번` : "보기 번호 없음"}
+                        </p>
+                        <p className="mt-1.5 text-sm leading-relaxed text-neutral-50">{correct.text}</p>
+                        {correctMissingIdx ? (
+                          <p className="mt-2 text-xs text-amber-200/90">
+                            정답 문자열이 선택지와 일치하지 않습니다.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : (
@@ -219,9 +331,47 @@ function QuizPageContent() {
             <h1 className="mt-1 text-lg font-semibold">
               {currentQuestion?.questionNumber}번. {currentQuestion?.questionDescription}
             </h1>
-            <p className="mt-1 text-xs text-neutral-500">
-              난이도 {currentQuestion?.difficulty} / {currentQuestion?.questionCategory}
-            </p>
+
+            {currentQuestion ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleInfoReveal("difficulty")}
+                  className="cursor-pointer rounded-md border border-neutral-600 bg-neutral-950/80 px-2.5 py-1 text-[11px] text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-800"
+                >
+                  {currentInfoReveal.difficulty ? "난이도 숨기기" : "난이도 보기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleInfoReveal("category")}
+                  className="cursor-pointer rounded-md border border-neutral-600 bg-neutral-950/80 px-2.5 py-1 text-[11px] text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-800"
+                >
+                  {currentInfoReveal.category ? "유형 숨기기" : "유형 보기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleInfoReveal("hint")}
+                  className="cursor-pointer rounded-md border border-neutral-600 bg-neutral-950/80 px-2.5 py-1 text-[11px] text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-800"
+                >
+                  {currentInfoReveal.hint ? "힌트 숨기기" : "힌트 보기"}
+                </button>
+              </div>
+            ) : null}
+
+            {currentQuestion && currentInfoReveal.difficulty ? (
+              <p className="mt-2 text-xs text-neutral-400">난이도: {currentQuestion.difficulty}</p>
+            ) : null}
+            {currentQuestion && currentInfoReveal.category ? (
+              <p className="mt-1 text-xs text-neutral-400">유형: {currentQuestion.questionCategory}</p>
+            ) : null}
+            {currentQuestion && currentInfoReveal.hint ? (
+              <p className="mt-1 text-xs text-amber-200/90">
+                힌트:{" "}
+                {currentQuestion.hint?.trim()
+                  ? currentQuestion.hint
+                  : "이 문제에는 등록된 힌트가 없습니다."}
+              </p>
+            ) : null}
 
             <div className="mt-4 flex flex-col gap-2">
               {currentQuestion?.choices.map((choice, idx) => (
