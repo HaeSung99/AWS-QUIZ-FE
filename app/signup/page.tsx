@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+/** 백엔드 `EMAIL_RESEND_COOLDOWN_MS`(120초)와 동일하게 유지 */
+const SEND_CODE_COOLDOWN_SEC = 120;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 
@@ -23,6 +25,15 @@ export default function SignupPage() {
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [sendCooldownLeft, setSendCooldownLeft] = useState(0);
+
+  useEffect(() => {
+    if (sendCooldownLeft <= 0) return undefined;
+    const id = window.setInterval(() => {
+      setSendCooldownLeft((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [sendCooldownLeft > 0]);
 
   const handleSendCode = async () => {
     setError("");
@@ -47,9 +58,18 @@ export default function SignupPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.message ?? "인증코드 발송 실패");
+        if (response.status === 429 && typeof data?.message === "string") {
+          const m = data.message.match(/약 (\d+)초/);
+          if (m) {
+            setSendCooldownLeft(Math.min(SEND_CODE_COOLDOWN_SEC, Math.max(1, parseInt(m[1], 10))));
+          }
+        }
+        throw new Error(
+          Array.isArray(data?.message) ? data.message.join(", ") : (data?.message ?? "인증코드 발송 실패"),
+        );
       }
       setCodeSent(true);
+      setSendCooldownLeft(SEND_CODE_COOLDOWN_SEC);
       setVerificationMessage(
         data?.devCode
           ? `${data?.message ?? "인증코드 발송 완료"} (개발코드: ${data.devCode})`
@@ -178,6 +198,7 @@ export default function SignupPage() {
                   setEmail(e.target.value);
                   setIsEmailVerified(false);
                   setCodeSent(false);
+                  setSendCooldownLeft(0);
                 }}
                 className="w-full rounded-xl border border-neutral-700 bg-black/70 px-3 py-2.5 text-sm outline-none transition focus:border-neutral-400"
                 required
@@ -185,10 +206,14 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={handleSendCode}
-                disabled={sendingCode}
+                disabled={sendingCode || sendCooldownLeft > 0}
                 className="min-w-[108px] shrink-0 whitespace-nowrap cursor-pointer rounded-xl border border-neutral-600 bg-neutral-900 px-3 py-2.5 text-sm transition hover:border-neutral-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {sendingCode ? "발송 중..." : "코드 발송"}
+                {sendingCode
+                  ? "발송 중..."
+                  : sendCooldownLeft > 0
+                    ? `${sendCooldownLeft}초 후 재발송`
+                    : "코드 발송"}
               </button>
             </div>
           </div>
