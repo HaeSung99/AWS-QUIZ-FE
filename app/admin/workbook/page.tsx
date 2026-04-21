@@ -12,6 +12,8 @@ type Workbook = {
   title: string;
   summary: string;
   questionCount: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 type WorkbookAccuracy = {
   workbookId: string;
@@ -35,6 +37,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+};
 
 export default function AdminWorkbookPage() {
   const isHydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
@@ -528,6 +541,10 @@ export default function AdminWorkbookPage() {
                     <p className="text-[11px] text-neutral-500">{workbook.certificationType}</p>
                     <p className="mt-1 text-sm font-medium leading-snug">{workbook.title}</p>
                     <p className="mt-1 line-clamp-2 text-xs text-neutral-400">{workbook.summary}</p>
+                    <p className="mt-1 text-[10px] text-neutral-500">
+                      작성일 {formatDateTime(workbook.createdAt)} / 수정일{" "}
+                      {formatDateTime(workbook.updatedAt)}
+                    </p>
                     <p className="mt-2 text-[11px] text-sky-300/90">
                       정답률 {accuracy ? `${accuracy.accuracy.toFixed(1)}%` : "-"}
                       {accuracy ? ` (참여 ${accuracy.attemptCount}명)` : ""}

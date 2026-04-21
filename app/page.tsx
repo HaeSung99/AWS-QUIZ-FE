@@ -36,6 +36,8 @@ type WorkbookItem = {
   certificationType: string;
   title: string;
   summary: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 type WorkbookAccuracyItem = {
   workbookId: string;
@@ -53,6 +55,18 @@ type StoredUser = {
 
 const pseudoRandomOrderValue = (id: string) =>
   id.split("").reduce((acc, ch, idx) => acc + ch.charCodeAt(0) * (idx + 17), 0);
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+};
 
 export default function Home() {
   const [search, setSearch] = useState("");
@@ -335,6 +349,10 @@ export default function Home() {
                               {typeof workbookAccuracyMap[workbook.id] === "number"
                                 ? `${workbookAccuracyMap[workbook.id].toFixed(1)}%`
                                 : "-"}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-neutral-500">
+                              작성일 {formatDateTime(workbook.createdAt)} / 수정일{" "}
+                              {formatDateTime(workbook.updatedAt)}
                             </p>
                           </div>
                           <Link
