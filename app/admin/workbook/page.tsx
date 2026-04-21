@@ -64,6 +64,11 @@ export default function AdminWorkbookPage() {
 
   const [saving, setSaving] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmMode, setConfirmMode] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmWorkbookId, setConfirmWorkbookId] = useState("");
+  const [confirmItemId, setConfirmItemId] = useState("");
 
   const auth = (() => {
     if (!isHydrated || !API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
@@ -165,8 +170,7 @@ export default function AdminWorkbookPage() {
     })();
   }, [auth.token, authRole]);
 
-  const onCreateWorkbook = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const saveWorkbook = async () => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
     setMessage("");
     setMessageTone("info");
@@ -203,6 +207,18 @@ export default function AdminWorkbookPage() {
       setSaving(false);
     }
   };
+  const onCreateWorkbook = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (editingWorkbookId) {
+      setConfirmMode("saveWorkbookEdit");
+      setConfirmMessage("문제집 수정 내용을 저장하시겠습니까?");
+      setConfirmWorkbookId("");
+      setConfirmItemId("");
+      setConfirmOpen(true);
+      return;
+    }
+    await saveWorkbook();
+  };
 
   const onDeleteWorkbook = async (workbookId: string) => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
@@ -233,8 +249,7 @@ export default function AdminWorkbookPage() {
     }
   };
 
-  const onSaveItem = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const saveItem = async () => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin" || !selectedWorkbookId) return;
     const choices = choiceValues
       .slice(0, choiceCount)
@@ -307,6 +322,18 @@ export default function AdminWorkbookPage() {
     } finally {
       setSavingItem(false);
     }
+  };
+  const onSaveItem = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (editingItemId) {
+      setConfirmMode("saveItemEdit");
+      setConfirmMessage(`${questionNumber}번 문제 수정 내용을 저장하시겠습니까?`);
+      setConfirmWorkbookId("");
+      setConfirmItemId("");
+      setConfirmOpen(true);
+      return;
+    }
+    await saveItem();
   };
 
   const onDeleteItem = async (itemId: string) => {
@@ -386,6 +413,27 @@ export default function AdminWorkbookPage() {
     const sum = accuracyRows.reduce((acc, row) => acc + row.accuracy, 0);
     return Number((sum / accuracyRows.length).toFixed(1));
   }, [accuracyRows]);
+  const onConfirmAction = async () => {
+    const mode = confirmMode;
+    const workbookId = confirmWorkbookId;
+    const itemId = confirmItemId;
+    setConfirmOpen(false);
+    if (mode === "deleteWorkbook" && workbookId) {
+      await onDeleteWorkbook(workbookId);
+      return;
+    }
+    if (mode === "deleteItem" && itemId) {
+      await onDeleteItem(itemId);
+      return;
+    }
+    if (mode === "saveWorkbookEdit") {
+      await saveWorkbook();
+      return;
+    }
+    if (mode === "saveItemEdit") {
+      await saveItem();
+    }
+  };
 
   if (!isHydrated) {
     return <main className="flex flex-1 items-center justify-center text-neutral-300">확인 중...</main>;
@@ -511,7 +559,15 @@ export default function AdminWorkbookPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void onDeleteWorkbook(workbook.id)}
+                        onClick={() => {
+                          setConfirmMode("deleteWorkbook");
+                          setConfirmMessage(
+                            `문제집 \"${workbook.title}\"을(를) 정말 삭제하시겠습니까? 관련 문항도 함께 삭제될 수 있습니다.`,
+                          );
+                          setConfirmWorkbookId(workbook.id);
+                          setConfirmItemId("");
+                          setConfirmOpen(true);
+                        }}
                         className="cursor-pointer rounded border border-rose-500/70 bg-rose-950/30 px-2 py-1 text-[11px] text-rose-200"
                       >
                         삭제
@@ -757,7 +813,13 @@ export default function AdminWorkbookPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => void onDeleteItem(item.id)}
+                            onClick={() => {
+                              setConfirmMode("deleteItem");
+                              setConfirmMessage(`${item.questionNumber}번 문제를 정말 삭제하시겠습니까?`);
+                              setConfirmItemId(item.id);
+                              setConfirmWorkbookId("");
+                              setConfirmOpen(true);
+                            }}
                             className="cursor-pointer rounded border border-rose-500/70 bg-rose-950/30 px-2 py-1 text-[11px] text-rose-200"
                           >
                             삭제
@@ -788,6 +850,43 @@ export default function AdminWorkbookPage() {
           >
             {message}
           </p>
+        ) : null}
+        {confirmOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            role="presentation"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setConfirmOpen(false);
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="admin-confirm-title"
+              className="w-full max-w-md rounded-xl border border-neutral-600 bg-neutral-950 p-5 shadow-2xl ring-1 ring-white/10"
+            >
+              <h2 id="admin-confirm-title" className="text-lg font-semibold text-neutral-50">
+                작업 확인
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-300">{confirmMessage}</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(false)}
+                  className="cursor-pointer rounded-lg border border-neutral-600 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onConfirmAction()}
+                  className="cursor-pointer rounded-lg border-2 border-amber-500/70 bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-400"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </section>
     </main>
