@@ -22,6 +22,16 @@ const SAA_GUIDE_LINKS = [
     label: "컴퓨팅 가이드",
     href: "https://velog.io/@haesung/AWS-SAA-C03-컴퓨팅",
   },
+  {
+    id: "saa-network",
+    label: "네트워크 가이드 #1 ",
+    href: "https://velog.io/@haesung/AWS-SAA-C03-네트워크",
+  },
+  {
+    id: "saa-network-2",
+    label: "네트워크 가이드 #2",
+    href: "https://velog.io/@haesung/AWS-SAA-C03-네트워크-2",
+  },
 ];
 
 export default function SaaGuidePage() {
