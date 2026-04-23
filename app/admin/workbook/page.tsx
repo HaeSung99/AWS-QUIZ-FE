@@ -151,8 +151,13 @@ export default function AdminWorkbookPage() {
       );
       setItems(list);
       if (!editingItemId) {
+        const cap = workbooks.find((w) => w.id === workbookId)?.questionCount ?? 0;
         const lastNumber = list.length > 0 ? Math.max(...list.map((item) => item.questionNumber)) : 0;
-        setQuestionNumber(lastNumber + 1);
+        if (cap > 0 && list.length >= cap) {
+          setQuestionNumber(cap);
+        } else {
+          setQuestionNumber(lastNumber + 1);
+        }
       }
     } catch {
       setItems([]);
@@ -275,6 +280,17 @@ export default function AdminWorkbookPage() {
 
   const saveItem = async () => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin" || !selectedWorkbookId) return;
+    if (
+      !editingItemId &&
+      selectedWorkbook &&
+      items.length >= selectedWorkbook.questionCount
+    ) {
+      setMessage(
+        "목표 문항 수를 모두 채웠습니다. 새 문항을 추가하려면 목표 문항 수를 늘리거나 기존 문항을 삭제하세요.",
+      );
+      setMessageTone("error");
+      return;
+    }
     const choices = choiceValues
       .slice(0, choiceCount)
       .map((choice) => choice.trim());
@@ -423,6 +439,10 @@ export default function AdminWorkbookPage() {
     () => workbooks.find((wb) => wb.id === selectedWorkbookId) ?? null,
     [workbooks, selectedWorkbookId],
   );
+  const atNewItemLimit = useMemo(() => {
+    if (!selectedWorkbook || editingItemId) return false;
+    return items.length >= selectedWorkbook.questionCount;
+  }, [selectedWorkbook, items.length, editingItemId]);
   const workbookFormMode = editingWorkbookId ? "문제집 정보 수정 모드" : "새 문제집 생성 모드";
   const itemFormMode = !selectedWorkbookId
     ? "문제집 선택 필요"
@@ -746,6 +766,12 @@ export default function AdminWorkbookPage() {
                 문제 관리 {selectedWorkbook ? `- ${selectedWorkbook.title}` : ""}
               </h3>
               <p className="mt-1 text-xs text-amber-300">{itemFormMode}</p>
+              {atNewItemLimit ? (
+                <p className="mt-2 text-xs text-amber-200/90">
+                  목표 문항 수({selectedWorkbook?.questionCount}문항)를 모두 채웠습니다. 새 문항을 추가하려면 상단에서 목표
+                  문항 수를 늘리거나 기존 문항을 삭제하세요.
+                </p>
+              ) : null}
               {selectedWorkbook ? (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-neutral-700 bg-black/40 px-3 py-2 text-xs text-neutral-300">
                   <span>선택 문제집: {selectedWorkbook.title}</span>
@@ -867,7 +893,7 @@ export default function AdminWorkbookPage() {
                     />
                     <button
                       type="submit"
-                      disabled={savingItem}
+                      disabled={savingItem || atNewItemLimit}
                       className="cursor-pointer rounded-md border border-amber-500/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {savingItem ? "저장 중..." : editingItemId ? "문제 수정 저장" : "문제 생성"}
