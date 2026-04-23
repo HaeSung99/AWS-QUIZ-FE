@@ -12,6 +12,8 @@ type Workbook = {
   title: string;
   summary: string;
   questionCount: number;
+  /** 생략 시 기존 데이터로 간주(게시완료로 표시) */
+  status?: "draft" | "published";
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -37,6 +39,15 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
+
+const wbLatestTime = (wb: Workbook) => {
+  const u = wb.updatedAt ? new Date(wb.updatedAt).getTime() : NaN;
+  const c = wb.createdAt ? new Date(wb.createdAt).getTime() : NaN;
+  if (!Number.isNaN(u)) return u;
+  if (!Number.isNaN(c)) return c;
+  return 0;
+};
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "-";
   const d = new Date(value);
@@ -396,14 +407,16 @@ export default function AdminWorkbookPage() {
 
   const filteredWorkbooks = useMemo(() => {
     const q = searchKeyword.trim().toLowerCase();
-    if (!q) return workbooks;
-    return workbooks.filter((wb) => {
-      return (
-        wb.title.toLowerCase().includes(q) ||
-        wb.certificationType.toLowerCase().includes(q) ||
-        wb.summary.toLowerCase().includes(q)
-      );
-    });
+    const list = !q
+      ? workbooks
+      : workbooks.filter((wb) => {
+          return (
+            wb.title.toLowerCase().includes(q) ||
+            wb.certificationType.toLowerCase().includes(q) ||
+            wb.summary.toLowerCase().includes(q)
+          );
+        });
+    return [...list].sort((a, b) => wbLatestTime(b) - wbLatestTime(a));
   }, [workbooks, searchKeyword]);
 
   const selectedWorkbook = useMemo(
@@ -426,11 +439,43 @@ export default function AdminWorkbookPage() {
     const sum = accuracyRows.reduce((acc, row) => acc + row.accuracy, 0);
     return Number((sum / accuracyRows.length).toFixed(1));
   }, [accuracyRows]);
+  const setWorkbookStatus = async (workbookId: string, status: "draft" | "published") => {
+    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    setMessage("");
+    setMessageTone("info");
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/admin/questions/${workbookId}`,
+        { status },
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+      );
+      setMessage(status === "published" ? "게시되었습니다." : "게시가 취소되었습니다. (이용자 목록에서 숨깁니다)");
+      setMessageTone("success");
+      await loadData();
+    } catch (err) {
+      const text = axios.isAxiosError(err)
+        ? (Array.isArray(err.response?.data?.message)
+            ? err.response?.data?.message.join(", ")
+            : err.response?.data?.message) ?? err.message
+        : "상태를 변경하지 못했습니다.";
+      setMessage(text || "상태를 변경하지 못했습니다.");
+      setMessageTone("error");
+    }
+  };
+
   const onConfirmAction = async () => {
     const mode = confirmMode;
     const workbookId = confirmWorkbookId;
     const itemId = confirmItemId;
     setConfirmOpen(false);
+    if (mode === "publishWorkbook" && workbookId) {
+      await setWorkbookStatus(workbookId, "published");
+      return;
+    }
+    if (mode === "unpublishWorkbook" && workbookId) {
+      await setWorkbookStatus(workbookId, "draft");
+      return;
+    }
     if (mode === "deleteWorkbook" && workbookId) {
       await onDeleteWorkbook(workbookId);
       return;
@@ -540,6 +585,15 @@ export default function AdminWorkbookPage() {
                   >
                     <p className="text-[11px] text-neutral-500">{workbook.certificationType}</p>
                     <p className="mt-1 text-sm font-medium leading-snug">{workbook.title}</p>
+                    <p className="mt-1 text-[10px] font-medium">
+                      <span
+                        className={
+                          workbook.status === "draft" ? "text-amber-300" : "text-emerald-300/90"
+                        }
+                      >
+                        {workbook.status === "draft" ? "게시전" : "게시완료"}
+                      </span>
+                    </p>
                     <p className="mt-1 line-clamp-2 text-xs text-neutral-400">{workbook.summary}</p>
                     <p className="mt-1 text-[10px] text-neutral-500">
                       작성일 {formatDateTime(workbook.createdAt)} / 수정일{" "}
@@ -574,6 +628,39 @@ export default function AdminWorkbookPage() {
                       >
                         문제집 정보 수정
                       </button>
+                      {workbook.status === "draft" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmMode("publishWorkbook");
+                            setConfirmMessage(
+                              `「${workbook.title}」을(를) 게시하면 이용자 홈에 노출됩니다. (문항 수가 목표에 도달한 경우에만 목록에 표시됩니다) 진행할까요?`,
+                            );
+                            setConfirmWorkbookId(workbook.id);
+                            setConfirmItemId("");
+                            setConfirmOpen(true);
+                          }}
+                          className="cursor-pointer rounded border border-emerald-500/70 bg-emerald-950/30 px-2 py-1 text-[11px] text-emerald-200"
+                        >
+                          게시
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmMode("unpublishWorkbook");
+                            setConfirmMessage(
+                              `「${workbook.title}」게시를 취소하면 이용자에게 더 이상 보이지 않습니다. 진행할까요?`,
+                            );
+                            setConfirmWorkbookId(workbook.id);
+                            setConfirmItemId("");
+                            setConfirmOpen(true);
+                          }}
+                          className="cursor-pointer rounded border border-amber-500/60 bg-amber-950/20 px-2 py-1 text-[11px] text-amber-200"
+                        >
+                          게시 취소
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {

@@ -53,8 +53,13 @@ type StoredUser = {
   solvedWorkbookIds?: string[];
 };
 
-const pseudoRandomOrderValue = (id: string) =>
-  id.split("").reduce((acc, ch, idx) => acc + ch.charCodeAt(0) * (idx + 17), 0);
+const workbookLatestTime = (w: WorkbookItem) => {
+  const u = w.updatedAt ? new Date(w.updatedAt).getTime() : NaN;
+  const c = w.createdAt ? new Date(w.createdAt).getTime() : NaN;
+  if (!Number.isNaN(u)) return u;
+  if (!Number.isNaN(c)) return c;
+  return 0;
+};
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return "-";
@@ -188,11 +193,11 @@ export default function Home() {
     return workbookItems.filter((w) => w.title.toLowerCase().includes(q));
   }, [search, workbookItems]);
   const displayedWorkbooks = useMemo(() => {
-    if (search.trim()) return filteredWorkbooks;
-    const shuffled = [...filteredWorkbooks].sort(
-      (a, b) => pseudoRandomOrderValue(a.id) - pseudoRandomOrderValue(b.id),
+    const sorted = [...filteredWorkbooks].sort(
+      (a, b) => workbookLatestTime(b) - workbookLatestTime(a),
     );
-    return shuffled.slice(0, 12);
+    if (search.trim()) return sorted;
+    return sorted.slice(0, 12);
   }, [filteredWorkbooks, search]);
 
   const onCopyEmail = async () => {
