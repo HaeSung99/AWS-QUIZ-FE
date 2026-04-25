@@ -1,4 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_ORIGIN } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "공지사항",
+  description:
+    "AWS Quiz KR 공지사항. 서비스 안내·점검·업데이트. AWS 자격증 퀴즈·문제집 이용 시 참고하세요.",
+  alternates: { canonical: `${SITE_ORIGIN}/notice` },
+};
 
 type NoticeItem = { id: string; title: string; body: string; pinned?: boolean };
 

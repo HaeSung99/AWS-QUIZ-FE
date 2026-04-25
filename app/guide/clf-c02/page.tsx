@@ -1,4 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_ORIGIN } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "CLF-C02 가이드",
+  description:
+    "AWS Cloud Practitioner(CLF-C02) 준비 페이지. 기본 개념·요금·보안 등 가이드 예정. CLF 퀴즈·AWS 입문 시험 준비.",
+  keywords: ["CLF-C02", "AWS CLF", "Cloud Practitioner", "AWS 입문", "AWS 기초 시험"],
+  alternates: { canonical: `${SITE_ORIGIN}/guide/clf-c02` },
+};
 
 export default function ClfGuidePage() {
   return (

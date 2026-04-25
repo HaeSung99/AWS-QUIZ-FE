@@ -6,7 +6,7 @@ export default function TermsPage() {
       <div className="mx-auto w-full max-w-3xl rounded-xl border border-neutral-800 bg-neutral-950/70 p-6">
         <h1 className="text-xl font-semibold">이용약관</h1>
         <p className="mt-3 text-sm text-neutral-300">
-          본 약관은 AWS 문풀 서비스 이용과 관련한 기본 조건을 안내합니다.
+          본 약관은 AWS Quiz KR 서비스 이용과 관련한 기본 조건을 안내합니다.
         </p>
         <div className="mt-5 space-y-4 text-sm leading-relaxed text-neutral-300">
           <section>

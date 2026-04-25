@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { SITE_ORIGIN } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://awsquizkr.com";
+  const baseUrl = SITE_ORIGIN;
   const now = new Date();
 
   return [

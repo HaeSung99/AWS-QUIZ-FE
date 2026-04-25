@@ -2,24 +2,82 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { HeaderAuth } from "@/components/header-auth";
+import {
+  SITE_DEFAULT_DESCRIPTION,
+  SITE_DEFAULT_TITLE,
+  SITE_KEYWORDS,
+  SITE_ORIGIN,
+} from "@/lib/seo";
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_ORIGIN}/#website`,
+      url: SITE_ORIGIN,
+      name: "AWS Quiz KR",
+      alternateName: ["AWS Quiz KR", "awsquizkr", "AWS 퀴즈 KR"],
+      description: SITE_DEFAULT_DESCRIPTION,
+      inLanguage: "ko-KR",
+      publisher: { "@id": `${SITE_ORIGIN}/#organization` },
+    },
+    {
+      "@type": "Organization",
+      "@id": `${SITE_ORIGIN}/#organization`,
+      name: "AWS Quiz KR",
+      url: SITE_ORIGIN,
+    },
+    {
+      "@type": "WebApplication",
+      name: "AWS Quiz KR",
+      url: SITE_ORIGIN,
+      description: SITE_DEFAULT_DESCRIPTION,
+      applicationCategory: "EducationalApplication",
+      operatingSystem: "Web browser",
+      browserRequirements: "Requires JavaScript. 한국어 UI.",
+      inLanguage: "ko-KR",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "KRW",
+      },
+    },
+  ],
+};
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://awsquizkr.com"),
-  title: "AWS Quiz KR - AWS 자격증 준비를 위한 실전 퀴즈",
-  description:
-    "AWS 자격증(SAA, CLF 등) 합격을 위한 한국어 퀴즈 서비스입니다. 지금 바로 문제를 풀고 실력을 점검하세요!",
+  metadataBase: new URL(SITE_ORIGIN),
+  title: {
+    default: SITE_DEFAULT_TITLE,
+    template: "%s | AWS Quiz KR",
+  },
+  description: SITE_DEFAULT_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  alternates: {
+    canonical: SITE_ORIGIN,
+  },
   openGraph: {
     title: "AWS Quiz KR",
-    description: "AWS 자격증 준비는 여기서!",
-    url: "https://awsquizkr.com",
+    description: SITE_DEFAULT_DESCRIPTION,
+    url: SITE_ORIGIN,
     siteName: "AWS Quiz KR",
     locale: "ko_KR",
     type: "website",
     images: [
       {
-        url: "https://awsquizkr.com/logo.png",
+        url: `${SITE_ORIGIN}/logo.png`,
       },
     ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DEFAULT_DESCRIPTION.slice(0, 200),
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
   verification: {
     other: {
@@ -36,9 +94,13 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-black text-neutral-100">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-neutral-800 bg-black/90 px-4 py-3 backdrop-blur-sm">
           <Link href="/" className="text-base font-semibold text-neutral-100 transition hover:text-sky-300">
-            AWS 문풀
+            AWS Quiz KR
           </Link>
           <div className="flex items-center gap-2">
             <HeaderAuth />

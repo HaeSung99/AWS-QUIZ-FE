@@ -169,7 +169,7 @@ export default function SignupPage() {
       <div className="w-full max-w-lg rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-950 to-neutral-900 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)] sm:p-8">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">AWS 문풀</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">AWS Quiz KR</p>
             <h1 className="mt-2 text-2xl font-semibold">회원가입</h1>
           </div>
         </div>

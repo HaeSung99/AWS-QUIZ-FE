@@ -1,4 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_ORIGIN } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "SAA-C03 가이드",
+  description:
+    "AWS Solutions Architect Associate(SAA-C03) 시험 준비 참고 링크 모음. SAA 퀴즈·문제와 함께 보면 좋은 주제별 정리. AWS SAA 준비, 아키텍트 자격증 학습.",
+  keywords: [
+    "SAA-C03",
+    "AWS SAA",
+    "Solutions Architect Associate",
+    "AWS SAA 준비",
+    "AWS SAA 퀴즈",
+    "AWS 아키텍트",
+  ],
+  alternates: { canonical: `${SITE_ORIGIN}/guide/saa-c03` },
+};
 
 const SAA_GUIDE_LINKS = [
   { id: "saa-s3", label: "S3 가이드", href: "https://velog.io/@haesung/AWS-SAA-C03-S3" },
