@@ -388,9 +388,7 @@ function QuizPageContent() {
                 <button
                   key={`${choice}-${idx}`}
                   type="button"
-                  onClick={() =>
-                    setAnswers((prev) => ({ ...prev, [currentQuestion.id]: choice }))
-                  }
+                  onClick={() => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: choice }))}
                   className={`cursor-pointer rounded-md border px-3 py-2 text-left text-sm transition hover:-translate-y-0.5 ${
                     answers[currentQuestion.id] === choice
                       ? "border-sky-500 bg-sky-950/40 hover:bg-sky-900/40"

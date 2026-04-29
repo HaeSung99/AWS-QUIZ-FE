@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 type AuthUser = { id: number; email: string; name: string; role: "user" | "admin" };
-type DailyRow = { date: string; count: number };
-type MonthlyRow = { month: string; count: number };
+type VisitorBreakdown = { human?: number; bot?: number; unknown?: number };
+type DailyRow = { date: string; count: number } & VisitorBreakdown;
+type MonthlyRow = { month: string; count: number } & VisitorBreakdown;
 type AdminOverview = {
   totalUsers: number;
   todayVisitors: number;
@@ -49,11 +50,14 @@ function DailyLineChartBlock({
   title,
   rows,
   stroke,
+  showVisitorBreakdown = false,
 }: {
   title: string;
   rows: DailyRow[];
   stroke: string;
+  showVisitorBreakdown?: boolean;
 }) {
+  const [hoveredRow, setHoveredRow] = useState<DailyRow | null>(null);
   const { w, h, padL, padR, padT, padB } = LINE_CHART;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
@@ -76,8 +80,17 @@ function DailyLineChartBlock({
   }
 
   return (
-    <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+    <section className="relative rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
       <h2 className="text-sm font-semibold">{title}</h2>
+      {showVisitorBreakdown && hoveredRow ? (
+        <div className="pointer-events-none absolute right-4 top-10 z-10 rounded-md border border-neutral-600 bg-black/90 px-3 py-2 text-[11px] shadow-xl">
+          <p className="font-semibold text-neutral-100">{hoveredRow.date}</p>
+          <p className="mt-1 text-neutral-300">전체 {hoveredRow.count}</p>
+          <p className="text-emerald-300">인간 추정 {hoveredRow.human ?? 0}</p>
+          <p className="text-rose-300">봇 추정 {hoveredRow.bot ?? 0}</p>
+          <p className="text-amber-300">미분류 {hoveredRow.unknown ?? 0}</p>
+        </div>
+      ) : null}
       <div className="mt-3 w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${w} ${h}`}
@@ -155,6 +168,25 @@ function DailyLineChartBlock({
             />
           ) : null}
 
+          {showVisitorBreakdown &&
+            n > 0 &&
+            rows.map((row, idx) => {
+              const x = n === 1 ? padL + innerW / 2 : padL + (idx / (n - 1)) * innerW;
+              const y = padT + innerH - (row.count / yMax) * innerH;
+              return (
+                <circle
+                  key={`hover-${row.date}`}
+                  cx={x}
+                  cy={y}
+                  r="8"
+                  fill="transparent"
+                  stroke="transparent"
+                  onMouseEnter={() => setHoveredRow(row)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                />
+              );
+            })}
+
           {n > 0 &&
             labels.map((idx) => {
               const x =
@@ -184,16 +216,19 @@ function DailyLineChartBlock({
 function MonthlyGridBlock({
   title,
   rows,
+  showVisitorBreakdown = false,
 }: {
   title: string;
   rows: MonthlyRow[];
+  showVisitorBreakdown?: boolean;
 }) {
+  const [hoveredRow, setHoveredRow] = useState<MonthlyRow | null>(null);
   const list = rows.slice(-12);
   const periodStart = list[0]?.month;
   const periodEnd = list[list.length - 1]?.month;
 
   return (
-    <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
+    <section className="relative rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold">{title}</h2>
         {periodStart && periodEnd ? (
@@ -202,9 +237,23 @@ function MonthlyGridBlock({
           </p>
         ) : null}
       </div>
+      {showVisitorBreakdown && hoveredRow ? (
+        <div className="pointer-events-none absolute right-4 top-10 z-10 rounded-md border border-neutral-600 bg-black/90 px-3 py-2 text-[11px] shadow-xl">
+          <p className="font-semibold text-neutral-100">{formatMonthLabel(hoveredRow.month)}</p>
+          <p className="mt-1 text-neutral-300">전체 {hoveredRow.count}</p>
+          <p className="text-emerald-300">인간 추정 {hoveredRow.human ?? 0}</p>
+          <p className="text-rose-300">봇 추정 {hoveredRow.bot ?? 0}</p>
+          <p className="text-amber-300">미분류 {hoveredRow.unknown ?? 0}</p>
+        </div>
+      ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {list.map((row) => (
-          <div key={row.month} className="rounded border border-neutral-800 bg-black/40 px-2 py-2">
+          <div
+            key={row.month}
+            className="rounded border border-neutral-800 bg-black/40 px-2 py-2"
+            onMouseEnter={() => setHoveredRow(row)}
+            onMouseLeave={() => setHoveredRow(null)}
+          >
             <p className="text-[10px] text-neutral-500">{formatMonthLabel(row.month)}</p>
             <p className="mt-0.5 font-mono text-[11px] text-neutral-400">{row.month}</p>
             <p className="mt-1 text-sm font-semibold text-neutral-100">{row.count}</p>
@@ -345,8 +394,13 @@ export default function AdminDashboardPage() {
               title="일자별 접속자수 (최근 30일)"
               rows={overview?.dailyVisitors ?? []}
               stroke="#38bdf8"
+              showVisitorBreakdown
             />
-            <MonthlyGridBlock title="월자별 접속자수 (최근 12개월)" rows={overview?.monthlyVisitors ?? []} />
+            <MonthlyGridBlock
+              title="월자별 접속자수 (최근 12개월)"
+              rows={overview?.monthlyVisitors ?? []}
+              showVisitorBreakdown
+            />
             <DailyLineChartBlock
               title="일자별 가입자수 (최근 30일)"
               rows={overview?.dailySignups ?? []}

@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
@@ -81,6 +81,36 @@ export default function HomeClient() {
   const [solvedWorkbookIds, setSolvedWorkbookIds] = useState<string[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
+  const sentVisitEventsRef = useRef<Set<string>>(new Set());
+
+  const getClientKey = () => {
+    if (typeof window === "undefined") return "";
+    const saved = localStorage.getItem("aws_quiz_visit_key");
+    const clientKey =
+      saved ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
+    if (!saved) {
+      localStorage.setItem("aws_quiz_visit_key", clientKey);
+    }
+    return clientKey;
+  };
+
+  const trackVisitEvent = (eventType: string) => {
+    if (!API_BASE_URL || typeof window === "undefined") return;
+    if (sentVisitEventsRef.current.has(eventType)) return;
+    sentVisitEventsRef.current.add(eventType);
+    const clientKey = getClientKey();
+    const isLoggedInNow = ACCESS_TOKEN_KEY ? Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)) : false;
+    void axios
+      .post(`${API_BASE_URL}/public/track-visit`, {
+        clientKey,
+        eventType,
+        isLoggedIn: isLoggedInNow,
+      })
+      .catch(() => undefined);
+  };
 
   useEffect(() => {
     if (!API_BASE_URL) return;
@@ -129,17 +159,22 @@ export default function HomeClient() {
   }, []);
 
   useEffect(() => {
-    if (!API_BASE_URL || typeof window === "undefined") return;
-    const saved = localStorage.getItem("aws_quiz_visit_key");
-    const clientKey =
-      saved ||
-      (typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
-    if (!saved) {
-      localStorage.setItem("aws_quiz_visit_key", clientKey);
-    }
-    void axios.post(`${API_BASE_URL}/public/track-visit`, { clientKey }).catch(() => undefined);
+    trackVisitEvent("page_view");
+
+    const dwellTimer = window.setTimeout(() => {
+      trackVisitEvent("dwell_5s");
+    }, 5_000);
+
+    const onScroll = () => {
+      trackVisitEvent("scroll");
+      window.removeEventListener("scroll", onScroll);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.clearTimeout(dwellTimer);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -212,7 +247,10 @@ export default function HomeClient() {
   };
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 text-neutral-100">
+    <main
+      className="min-h-screen bg-black px-4 py-10 text-neutral-100"
+      onClickCapture={() => trackVisitEvent("click")}
+    >
       <div className="mx-auto flex w-full max-w-[81rem] flex-col gap-9">
         <header className="max-w-4xl space-y-2">
           <h1 className="text-lg font-semibold tracking-tight text-neutral-100 sm:text-2xl">
@@ -269,7 +307,12 @@ export default function HomeClient() {
             id="main-search"
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              if (e.target.value.trim()) {
+                trackVisitEvent("search_input");
+              }
+            }}
             placeholder="문제집 제목 검색 (예: SAA)"
             className="w-full rounded-lg border border-neutral-600 bg-neutral-950 px-6 py-[1.125rem] text-sm text-neutral-100 placeholder:text-neutral-500 outline-none ring-neutral-500 focus:border-neutral-400 focus:ring-2"
           />
