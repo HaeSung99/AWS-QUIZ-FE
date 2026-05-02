@@ -493,7 +493,7 @@ function QuizPageContent() {
                 유형: {currentQuestion.questionCategory}
               </p>
             ) : null}
-            {currentQuestion?.recommendReason ? (
+            {!isDailyMode && currentQuestion?.recommendReason ? (
               <p className="mt-2 rounded-md border border-fuchsia-500/40 bg-fuchsia-950/25 px-3 py-2 text-xs leading-relaxed text-fuchsia-100">
                 추천 이유: {currentQuestion.recommendReason}
                 {typeof currentQuestion.similarity === "number"

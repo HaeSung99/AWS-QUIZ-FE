@@ -39,11 +39,6 @@ type QuestionItem = {
   difficulty: string;
   questionCategory: string;
 };
-type QuestionCategoryOption = {
-  value: string;
-  description: string;
-  keywords: string[];
-};
 type CategoryRecommendationResponse = {
   category: string;
   score: number;
@@ -57,173 +52,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
-const QUESTION_CATEGORY_MAP: QuestionCategoryOption[] = [
-  {
-    value: "IAM",
-    description: "사용자, 역할, 정책, 권한, MFA, AssumeRole",
-    keywords: [
-      "iam",
-      "user",
-      "role",
-      "policy",
-      "permission",
-      "mfa",
-      "assume role",
-    ],
-  },
-  {
-    value: "EC2",
-    description: "인스턴스, AMI, EBS, 보안 그룹, 배치 그룹",
-    keywords: [
-      "ec2",
-      "instance",
-      "ami",
-      "ebs",
-      "security group",
-      "placement group",
-    ],
-  },
-  {
-    value: "S3",
-    description: "버킷, 객체, 버전 관리, 수명 주기, 스토리지 클래스",
-    keywords: [
-      "s3",
-      "bucket",
-      "object",
-      "versioning",
-      "lifecycle",
-      "storage class",
-    ],
-  },
-  {
-    value: "VPC",
-    description: "서브넷, 라우팅, NAT, NACL, 피어링, 엔드포인트",
-    keywords: [
-      "vpc",
-      "subnet",
-      "route table",
-      "nat",
-      "nacl",
-      "peering",
-      "endpoint",
-    ],
-  },
-  {
-    value: "RDS",
-    description: "관계형 데이터베이스, Multi-AZ, Read Replica, 백업",
-    keywords: [
-      "rds",
-      "aurora",
-      "multi-az",
-      "read replica",
-      "backup",
-      "database",
-    ],
-  },
-  {
-    value: "DynamoDB",
-    description: "NoSQL, 파티션 키, 글로벌 보조 인덱스, 처리량",
-    keywords: [
-      "dynamodb",
-      "partition key",
-      "sort key",
-      "gsi",
-      "lsi",
-      "throughput",
-    ],
-  },
-  {
-    value: "Lambda",
-    description: "서버리스 함수, 이벤트 트리거, 실행 역할, 콜드 스타트",
-    keywords: [
-      "lambda",
-      "function",
-      "serverless",
-      "trigger",
-      "runtime",
-      "cold start",
-    ],
-  },
-  {
-    value: "CloudWatch",
-    description: "로그, 지표, 알람, 모니터링",
-    keywords: ["cloudwatch", "logs", "metrics", "alarm", "monitoring"],
-  },
-  {
-    value: "Route53",
-    description: "DNS, 호스팅 영역, 라우팅 정책, 헬스 체크",
-    keywords: [
-      "route 53",
-      "route53",
-      "dns",
-      "hosted zone",
-      "routing policy",
-      "health check",
-    ],
-  },
-  {
-    value: "CloudFront",
-    description: "CDN, 캐시, 배포, 오리진, 엣지 로케이션",
-    keywords: ["cloudfront", "cdn", "cache", "distribution", "origin", "edge"],
-  },
-  {
-    value: "ELB/AutoScaling",
-    description: "로드 밸런서, 대상 그룹, 오토스케일링, 헬스 체크",
-    keywords: [
-      "elb",
-      "alb",
-      "nlb",
-      "load balancer",
-      "target group",
-      "auto scaling",
-    ],
-  },
-  {
-    value: "SQS/SNS/EventBridge",
-    description: "메시징, Pub/Sub, 이벤트 라우팅, 비동기 처리",
-    keywords: ["sqs", "sns", "eventbridge", "queue", "topic", "event bus"],
-  },
-  {
-    value: "Security/KMS",
-    description: "암호화, KMS 키, Secrets Manager, 보안 모범 사례",
-    keywords: [
-      "kms",
-      "encryption",
-      "secret",
-      "certificate",
-      "waf",
-      "shield",
-      "security",
-    ],
-  },
-  {
-    value: "Billing/Support",
-    description: "요금, 비용 최적화, 지원 플랜, Trusted Advisor",
-    keywords: [
-      "billing",
-      "cost",
-      "pricing",
-      "support plan",
-      "trusted advisor",
-      "budget",
-    ],
-  },
-  {
-    value: "Well-Architected",
-    description: "운영 우수성, 보안, 안정성, 성능, 비용 최적화 원칙",
-    keywords: [
-      "well-architected",
-      "reliability",
-      "operational excellence",
-      "best practice",
-    ],
-  },
-  {
-    value: "Containers",
-    description: "ECS, EKS, 컨테이너, 태스크, 클러스터",
-    keywords: ["ecs", "eks", "container", "task", "cluster", "fargate"],
-  },
-];
 
 const wbLatestTime = (wb: Workbook) => {
   const u = wb.updatedAt ? new Date(wb.updatedAt).getTime() : NaN;
@@ -275,6 +103,9 @@ export default function AdminWorkbookPage() {
   const [hint, setHint] = useState("");
   const [difficulty, setDifficulty] = useState("");
   const [questionCategory, setQuestionCategory] = useState("");
+  const [usedQuestionCategories, setUsedQuestionCategories] = useState<
+    string[]
+  >([]);
   const [editingItemId, setEditingItemId] = useState("");
   const [recommendingCategory, setRecommendingCategory] = useState(false);
   const [categoryRecommendations, setCategoryRecommendations] = useState<
@@ -373,16 +204,22 @@ export default function AdminWorkbookPage() {
   const loadData = async () => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
     try {
-      const [workbookRes, accuracyRes] = await Promise.all([
+      const [workbookRes, accuracyRes, categoryRes] = await Promise.all([
         axios.get<Workbook[]>(`${API_BASE_URL}/admin/questions`, {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
         axios.get<WorkbookAccuracy[]>(
           `${API_BASE_URL}/public/workbooks/accuracy`,
         ),
+        axios.get<string[]>(`${API_BASE_URL}/admin/question-categories`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        }),
       ]);
       setWorkbooks(Array.isArray(workbookRes.data) ? workbookRes.data : []);
       setAccuracyRows(Array.isArray(accuracyRes.data) ? accuracyRes.data : []);
+      setUsedQuestionCategories(
+        Array.isArray(categoryRes.data) ? categoryRes.data : [],
+      );
     } catch (err) {
       const text = axios.isAxiosError(err)
         ? ((Array.isArray(err.response?.data?.message)
@@ -393,6 +230,7 @@ export default function AdminWorkbookPage() {
       setMessageTone("error");
       setWorkbooks([]);
       setAccuracyRows([]);
+      setUsedQuestionCategories([]);
     }
   };
 
@@ -601,6 +439,9 @@ export default function AdminWorkbookPage() {
     setRecommendingCategory(true);
     setCategoryRecommendations([]);
     try {
+      const categoryCandidates = usedQuestionCategories.map((category) => ({
+        value: category,
+      }));
       const { data } = await axios.post<CategoryRecommendationResponse[]>(
         `${API_BASE_URL}/admin/question-categories/recommend`,
         {
@@ -609,7 +450,7 @@ export default function AdminWorkbookPage() {
           answer: selectedAnswer,
           hint,
           difficulty,
-          categories: QUESTION_CATEGORY_MAP,
+          categories: categoryCandidates,
         },
         { headers: { Authorization: `Bearer ${auth.token}` } },
       );
@@ -617,10 +458,6 @@ export default function AdminWorkbookPage() {
       setCategoryRecommendations(recommendations);
       if (recommendations.length > 0) {
         setQuestionCategory(recommendations[0].category);
-        setMessage(
-          `추천 카테고리 Top 1: ${recommendations[0].category} (${recommendations[0].reason})`,
-        );
-        setMessageTone("success");
       } else {
         setMessage("추천 카테고리를 찾지 못했습니다.");
         setMessageTone("error");
@@ -1139,30 +976,39 @@ export default function AdminWorkbookPage() {
                       required
                     />
                     <div className="flex gap-2">
-                      <select
+                      <input
+                        list="question-category-options"
+                        type="text"
                         value={questionCategory}
                         onChange={(e) => setQuestionCategory(e.target.value)}
                         className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-black px-3 py-2 text-sm"
+                        placeholder={
+                          usedQuestionCategories.length > 0
+                            ? "기존 카테고리 선택 또는 직접 입력"
+                            : "카테고리를 직접 입력"
+                        }
                         required
-                      >
-                        <option value="">문제 종류 선택</option>
-                        {QUESTION_CATEGORY_MAP.map((category) => (
-                          <option key={category.value} value={category.value}>
-                            {category.value}
-                          </option>
+                      />
+                      <datalist id="question-category-options">
+                        {usedQuestionCategories.map((category) => (
+                          <option key={category} value={category} />
                         ))}
-                      </select>
+                      </datalist>
                       <button
                         type="button"
                         onClick={recommendQuestionCategory}
                         disabled={
-                          !questionDescription.trim() || recommendingCategory
+                          !questionDescription.trim() ||
+                          usedQuestionCategories.length === 0 ||
+                          recommendingCategory
                         }
                         className="shrink-0 cursor-pointer rounded-md border border-sky-500/70 bg-sky-950/30 px-3 py-2 text-xs text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
                         title={
-                          questionDescription.trim()
+                          !questionDescription.trim()
+                            ? "문제 설명을 입력하면 추천할 수 있습니다."
+                            : usedQuestionCategories.length > 0
                             ? "기존 문제 임베딩과 비교해 카테고리 Top 3를 추천합니다."
-                            : "문제 설명을 입력하면 추천할 수 있습니다."
+                            : "아직 저장된 카테고리가 없어 직접 입력해야 합니다."
                         }
                       >
                         {recommendingCategory ? "추천 중..." : "AI 추천"}

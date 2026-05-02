@@ -341,8 +341,7 @@ export default function HomeClient() {
     if (search.trim()) return sorted;
     return sorted.slice(0, 12);
   }, [filteredWorkbooks, search]);
-  const topWeakCategory =
-    myWeakCategories[0] ?? globalWeakCategories[0] ?? null;
+  const topWeakCategory = myWeakCategories[0] ?? null;
   const learningSummaryCards = [
     {
       label: "풀이 완료",
@@ -365,11 +364,15 @@ export default function HomeClient() {
       tone: "fuchsia",
     },
     {
-      label: "주요 약점",
-      value: topWeakCategory?.category ?? "데이터 대기",
-      helper: topWeakCategory
-        ? `오답률 ${topWeakCategory.wrongRate.toFixed(1)}%`
-        : "문제를 풀면 표시됩니다",
+      label: "이용자님의 주요 약점",
+      value: isLoggedIn
+        ? (topWeakCategory?.category ?? "데이터 대기")
+        : "로그인 필요",
+      helper: !isLoggedIn
+        ? "로그인하면 개인 약점이 표시됩니다"
+        : topWeakCategory
+          ? `개인 풀이 기준 오답률 ${topWeakCategory.wrongRate.toFixed(1)}%`
+          : "문제를 풀면 개인 약점이 표시됩니다",
       tone: "sky",
     },
   ];
