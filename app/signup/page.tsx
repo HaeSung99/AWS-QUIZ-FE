@@ -9,12 +9,41 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const SEND_CODE_COOLDOWN_SEC = 120;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
+const TARGET_CERT_NONE = "";
+const AWS_CERTIFICATION_OPTIONS = [
+  "SAA-C03",
+  "CLF-C02",
+  "DVA-C02",
+  "SOA-C02",
+  "SAP-C02",
+  "DOP-C02",
+  "SCS-C02",
+  "ANS-C01",
+  "MLS-C01",
+  "DEA-C01",
+  "AIF-C01",
+] as const;
+const AWS_CERTIFICATION_LABELS: Record<string, string> = {
+  "": "정하지 않음",
+  "SAA-C03": "SAA-C03 - Solutions Architect Associate",
+  "CLF-C02": "CLF-C02 - Cloud Practitioner",
+  "DVA-C02": "DVA-C02 - Developer Associate",
+  "SOA-C02": "SOA-C02 - SysOps Administrator Associate",
+  "SAP-C02": "SAP-C02 - Solutions Architect Professional",
+  "DOP-C02": "DOP-C02 - DevOps Engineer Professional",
+  "SCS-C02": "SCS-C02 - Security Specialty",
+  "ANS-C01": "ANS-C01 - Advanced Networking Specialty",
+  "MLS-C01": "MLS-C01 - Machine Learning Specialty",
+  "DEA-C01": "DEA-C01 - Data Engineer Associate",
+  "AIF-C01": "AIF-C01 - AI Practitioner",
+};
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [targetCertificationType, setTargetCertificationType] = useState(TARGET_CERT_NONE);
   const [verificationCode, setVerificationCode] = useState("");
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
@@ -145,7 +174,12 @@ export default function SignupPage() {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          targetCertificationType: targetCertificationType || null,
+        }),
       });
 
       const data = await response.json();
@@ -257,6 +291,25 @@ export default function SignupPage() {
               className="w-full rounded-xl border border-neutral-700 bg-black/70 px-3 py-2.5 text-sm outline-none transition focus:border-neutral-400"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-neutral-400">준비 중인 AWS 자격증</label>
+            <select
+              value={targetCertificationType}
+              onChange={(e) => setTargetCertificationType(e.target.value)}
+              className="w-full rounded-xl border border-neutral-700 bg-black/70 px-3 py-2.5 text-sm outline-none transition focus:border-neutral-400"
+            >
+              <option value={TARGET_CERT_NONE}>{AWS_CERTIFICATION_LABELS[TARGET_CERT_NONE]}</option>
+              {AWS_CERTIFICATION_OPTIONS.map((cert) => (
+                <option key={cert} value={cert}>
+                  {AWS_CERTIFICATION_LABELS[cert]}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-neutral-500">
+              선택하지 않아도 가입할 수 있으며, 마이페이지에서 나중에 변경할 수 있습니다.
+            </p>
           </div>
 
           <div className="rounded-xl border border-neutral-800 bg-black/40 p-3 text-xs text-neutral-300">

@@ -83,10 +83,13 @@ export default function LoginPage() {
           <Link href="/signup" className="text-amber-300 hover:underline">
             회원가입
           </Link>
-          <Link href="/" className="text-sky-400 hover:underline">
-            메인으로
+          <Link href="/forgot-password" className="text-sky-300 hover:underline">
+            비밀번호 찾기
           </Link>
         </div>
+        <Link href="/" className="mt-3 block text-right text-sm text-sky-400 hover:underline">
+          메인으로
+        </Link>
       </div>
     </main>
   );

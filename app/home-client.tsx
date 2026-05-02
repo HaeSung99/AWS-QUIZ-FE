@@ -64,6 +64,7 @@ type StoredUser = {
   email: string;
   name: string;
   role: "user" | "admin";
+  targetCertificationType?: string | null;
   solvedWorkbookIds?: string[];
 };
 
@@ -111,6 +112,8 @@ export default function HomeClient() {
   } | null>(null);
   const [solvedWorkbookIds, setSolvedWorkbookIds] = useState<string[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [targetCertificationType, setTargetCertificationType] = useState<string | null>(null);
+  const [showDailyCertModal, setShowDailyCertModal] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
   const sentVisitEventsRef = useRef<Set<string>>(new Set());
 
@@ -296,8 +299,10 @@ export default function HomeClient() {
         if (Array.isArray(parsed.solvedWorkbookIds)) {
           setSolvedWorkbookIds(parsed.solvedWorkbookIds);
         }
+        setTargetCertificationType(parsed.targetCertificationType ?? null);
       } catch {
         setSolvedWorkbookIds([]);
+        setTargetCertificationType(null);
       }
 
       try {
@@ -311,6 +316,7 @@ export default function HomeClient() {
           ? data.user.solvedWorkbookIds
           : [];
         setSolvedWorkbookIds(solved);
+        setTargetCertificationType(data.user?.targetCertificationType ?? null);
 
         if (data.user) {
           localStorage.setItem(
@@ -379,6 +385,18 @@ export default function HomeClient() {
     }
   };
 
+  const handleDailyQuestionClick = () => {
+    if (!isLoggedIn) {
+      window.location.href = "/login";
+      return;
+    }
+    if (!targetCertificationType) {
+      setShowDailyCertModal(true);
+      return;
+    }
+    window.location.href = "/Quiz?daily=true";
+  };
+
   const renderWeakCategoryList = (
     title: string,
     items: WeakCategoryItem[],
@@ -390,6 +408,32 @@ export default function HomeClient() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
           {title}
         </h2>
+        {showDailyCertModal ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="w-full max-w-md rounded-2xl border border-neutral-700 bg-neutral-950 p-6 shadow-2xl">
+              <h2 className="text-lg font-semibold">목표 자격증을 먼저 선택해주세요</h2>
+              <p className="mt-3 text-sm leading-6 text-neutral-400">
+                오늘의 문제는 준비 중인 자격증을 기준으로 제공됩니다. 마이페이지에서 목표
+                자격증을 선택한 뒤 다시 시도해주세요.
+              </p>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Link
+                  href="/mypage"
+                  className="inline-flex justify-center rounded-lg border border-sky-500/70 bg-sky-500 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-400"
+                >
+                  마이페이지로 이동
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowDailyCertModal(false)}
+                  className="inline-flex justify-center rounded-lg border border-neutral-600 px-4 py-2 text-sm text-neutral-200 transition hover:border-neutral-400"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
       <ul className="mt-3 flex flex-col gap-2">
         {isLoading ? (
@@ -465,12 +509,13 @@ export default function HomeClient() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link
-                  href={isLoggedIn ? "/Quiz?recommended=weakness" : "/login"}
+                <button
+                  type="button"
+                  onClick={handleDailyQuestionClick}
                   className="inline-flex items-center justify-center rounded-lg border border-sky-500/70 bg-sky-500 px-4 py-2 text-sm font-semibold text-sky-950 transition hover:bg-sky-400"
                 >
-                  오늘의 추천 문제 풀기
-                </Link>
+                  오늘의 문제 풀기
+                </button>
                 <a
                   href="#workbooks"
                   className="inline-flex items-center justify-center rounded-lg border border-neutral-600 bg-neutral-950/70 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:border-neutral-400"

@@ -98,6 +98,12 @@ export function HeaderAuth() {
           Admin
         </Link>
       ) : null}
+      <Link
+        href="/mypage"
+        className="rounded-md border border-neutral-600 px-3 py-1.5 text-sm text-neutral-200 transition hover:border-neutral-400 hover:bg-neutral-900"
+      >
+        마이페이지
+      </Link>
       <button
         type="button"
         onClick={handleLogout}

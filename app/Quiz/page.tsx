@@ -24,6 +24,7 @@ type QuizQuestion = {
   hint?: string;
   difficulty: string;
   questionCategory: string;
+  certificationType?: string | null;
   similarity?: number;
   recommendReason?: string;
 };
@@ -77,6 +78,7 @@ function QuizPageContent() {
   const workbookId = searchParams.get("workbookId") ?? "";
   const category = searchParams.get("category")?.trim() ?? "";
   const isRecommendedMode = searchParams.get("recommended") === "weakness";
+  const isDailyMode = searchParams.get("daily") === "true";
   const token = useSyncExternalStore(
     subscribeAuthToken,
     getAuthTokenSnapshot,
@@ -100,7 +102,7 @@ function QuizPageContent() {
 
   useEffect(() => {
     if (!API_BASE_URL || !token) return;
-    if (!workbookId && !category && !isRecommendedMode) return;
+    if (!workbookId && !category && !isRecommendedMode && !isDailyMode) return;
     void (async () => {
       setMessage("");
       setQuestions([]);
@@ -110,14 +112,16 @@ function QuizPageContent() {
       setSubmitted(false);
       setCurrentIndex(0);
       try {
-        const url = isRecommendedMode
-          ? `${API_BASE_URL}/auth/me/recommended-questions?limit=20`
-          : workbookId
-            ? `${API_BASE_URL}/public/workbooks/${workbookId}/items`
-            : `${API_BASE_URL}/public/questions/by-category?category=${encodeURIComponent(category)}&limit=20`;
+        const url = isDailyMode
+          ? `${API_BASE_URL}/auth/me/daily-questions?limit=5`
+          : isRecommendedMode
+            ? `${API_BASE_URL}/auth/me/recommended-questions?limit=20`
+            : workbookId
+              ? `${API_BASE_URL}/public/workbooks/${workbookId}/items`
+              : `${API_BASE_URL}/public/questions/by-category?category=${encodeURIComponent(category)}&limit=20`;
         const { data } = await axios.get<QuizQuestion[]>(
           url,
-          isRecommendedMode
+          isRecommendedMode || isDailyMode
             ? { headers: { Authorization: `Bearer ${token}` } }
             : undefined,
         );
@@ -133,7 +137,7 @@ function QuizPageContent() {
         setMessage("문제 조회 실패");
       }
     })();
-  }, [token, workbookId, category, isRecommendedMode]);
+  }, [token, workbookId, category, isRecommendedMode, isDailyMode]);
 
   const currentQuestion = useMemo(
     () => (questions.length > 0 ? questions[currentIndex] : null),
@@ -216,6 +220,7 @@ function QuizPageContent() {
                 questionId: item.questionId,
                 questionCategory: q?.questionCategory ?? "미분류",
                 difficulty: q?.difficulty ?? "미지정",
+                certificationType: q?.certificationType ?? null,
                 selectedAnswer: item.selectedAnswer,
                 correctAnswer: item.correctAnswer,
                 isCorrect: item.isCorrect,
@@ -284,7 +289,7 @@ function QuizPageContent() {
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-neutral-100">
       <div className="mx-auto w-full max-w-3xl">
-        {!workbookId && !category && !isRecommendedMode ? (
+        {!workbookId && !category && !isRecommendedMode && !isDailyMode ? (
           <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 px-4 py-6 text-center text-sm text-neutral-400">
             풀이 정보가 없습니다.
           </div>
@@ -445,6 +450,7 @@ function QuizPageContent() {
         ) : (
           <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 p-6">
             <p className="text-xs text-neutral-500">
+              {isDailyMode ? "오늘의 문제 · " : ""}
               {isRecommendedMode ? "AI 추천 약점 문제 · " : ""}
               {isCategoryMode ? `유형: ${category} · ` : ""}
               {currentIndex + 1} / {questions.length}
