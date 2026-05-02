@@ -5,7 +5,12 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-type AuthUser = { id: number; email: string; name: string; role: "user" | "admin" };
+type AuthUser = {
+  id: number;
+  email: string;
+  name: string;
+  role: "user" | "admin";
+};
 type Workbook = {
   id: string;
   certificationType: string;
@@ -34,11 +39,191 @@ type QuestionItem = {
   difficulty: string;
   questionCategory: string;
 };
+type QuestionCategoryOption = {
+  value: string;
+  description: string;
+  keywords: string[];
+};
+type CategoryRecommendationResponse = {
+  category: string;
+  score: number;
+  maxSimilarity: number;
+  averageSimilarity: number;
+  similarQuestionCount: number;
+  reason: string;
+};
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
+const QUESTION_CATEGORY_MAP: QuestionCategoryOption[] = [
+  {
+    value: "IAM",
+    description: "사용자, 역할, 정책, 권한, MFA, AssumeRole",
+    keywords: [
+      "iam",
+      "user",
+      "role",
+      "policy",
+      "permission",
+      "mfa",
+      "assume role",
+    ],
+  },
+  {
+    value: "EC2",
+    description: "인스턴스, AMI, EBS, 보안 그룹, 배치 그룹",
+    keywords: [
+      "ec2",
+      "instance",
+      "ami",
+      "ebs",
+      "security group",
+      "placement group",
+    ],
+  },
+  {
+    value: "S3",
+    description: "버킷, 객체, 버전 관리, 수명 주기, 스토리지 클래스",
+    keywords: [
+      "s3",
+      "bucket",
+      "object",
+      "versioning",
+      "lifecycle",
+      "storage class",
+    ],
+  },
+  {
+    value: "VPC",
+    description: "서브넷, 라우팅, NAT, NACL, 피어링, 엔드포인트",
+    keywords: [
+      "vpc",
+      "subnet",
+      "route table",
+      "nat",
+      "nacl",
+      "peering",
+      "endpoint",
+    ],
+  },
+  {
+    value: "RDS",
+    description: "관계형 데이터베이스, Multi-AZ, Read Replica, 백업",
+    keywords: [
+      "rds",
+      "aurora",
+      "multi-az",
+      "read replica",
+      "backup",
+      "database",
+    ],
+  },
+  {
+    value: "DynamoDB",
+    description: "NoSQL, 파티션 키, 글로벌 보조 인덱스, 처리량",
+    keywords: [
+      "dynamodb",
+      "partition key",
+      "sort key",
+      "gsi",
+      "lsi",
+      "throughput",
+    ],
+  },
+  {
+    value: "Lambda",
+    description: "서버리스 함수, 이벤트 트리거, 실행 역할, 콜드 스타트",
+    keywords: [
+      "lambda",
+      "function",
+      "serverless",
+      "trigger",
+      "runtime",
+      "cold start",
+    ],
+  },
+  {
+    value: "CloudWatch",
+    description: "로그, 지표, 알람, 모니터링",
+    keywords: ["cloudwatch", "logs", "metrics", "alarm", "monitoring"],
+  },
+  {
+    value: "Route53",
+    description: "DNS, 호스팅 영역, 라우팅 정책, 헬스 체크",
+    keywords: [
+      "route 53",
+      "route53",
+      "dns",
+      "hosted zone",
+      "routing policy",
+      "health check",
+    ],
+  },
+  {
+    value: "CloudFront",
+    description: "CDN, 캐시, 배포, 오리진, 엣지 로케이션",
+    keywords: ["cloudfront", "cdn", "cache", "distribution", "origin", "edge"],
+  },
+  {
+    value: "ELB/AutoScaling",
+    description: "로드 밸런서, 대상 그룹, 오토스케일링, 헬스 체크",
+    keywords: [
+      "elb",
+      "alb",
+      "nlb",
+      "load balancer",
+      "target group",
+      "auto scaling",
+    ],
+  },
+  {
+    value: "SQS/SNS/EventBridge",
+    description: "메시징, Pub/Sub, 이벤트 라우팅, 비동기 처리",
+    keywords: ["sqs", "sns", "eventbridge", "queue", "topic", "event bus"],
+  },
+  {
+    value: "Security/KMS",
+    description: "암호화, KMS 키, Secrets Manager, 보안 모범 사례",
+    keywords: [
+      "kms",
+      "encryption",
+      "secret",
+      "certificate",
+      "waf",
+      "shield",
+      "security",
+    ],
+  },
+  {
+    value: "Billing/Support",
+    description: "요금, 비용 최적화, 지원 플랜, Trusted Advisor",
+    keywords: [
+      "billing",
+      "cost",
+      "pricing",
+      "support plan",
+      "trusted advisor",
+      "budget",
+    ],
+  },
+  {
+    value: "Well-Architected",
+    description: "운영 우수성, 보안, 안정성, 성능, 비용 최적화 원칙",
+    keywords: [
+      "well-architected",
+      "reliability",
+      "operational excellence",
+      "best practice",
+    ],
+  },
+  {
+    value: "Containers",
+    description: "ECS, EKS, 컨테이너, 태스크, 클러스터",
+    keywords: ["ecs", "eks", "container", "task", "cluster", "fargate"],
+  },
+];
 
 const wbLatestTime = (wb: Workbook) => {
   const u = wb.updatedAt ? new Date(wb.updatedAt).getTime() : NaN;
@@ -61,13 +246,19 @@ const formatDateTime = (value?: string | null) => {
 };
 
 export default function AdminWorkbookPage() {
-  const isHydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const isHydrated = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
   const [workbooks, setWorkbooks] = useState<Workbook[]>([]);
   const [accuracyRows, setAccuracyRows] = useState<WorkbookAccuracy[]>([]);
   const [items, setItems] = useState<QuestionItem[]>([]);
   const [selectedWorkbookId, setSelectedWorkbookId] = useState("");
   const [message, setMessage] = useState("");
-  const [messageTone, setMessageTone] = useState<"success" | "error" | "info">("info");
+  const [messageTone, setMessageTone] = useState<"success" | "error" | "info">(
+    "info",
+  );
   const [searchKeyword, setSearchKeyword] = useState("");
 
   const [certificationType, setCertificationType] = useState("");
@@ -85,6 +276,10 @@ export default function AdminWorkbookPage() {
   const [difficulty, setDifficulty] = useState("");
   const [questionCategory, setQuestionCategory] = useState("");
   const [editingItemId, setEditingItemId] = useState("");
+  const [recommendingCategory, setRecommendingCategory] = useState(false);
+  const [categoryRecommendations, setCategoryRecommendations] = useState<
+    CategoryRecommendationResponse[]
+  >([]);
 
   const [saving, setSaving] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
@@ -113,7 +308,10 @@ export default function AdminWorkbookPage() {
     setChoiceValues((prev) => {
       const next = [...prev];
       if (next.length < nextCount) {
-        return [...next, ...Array.from({ length: nextCount - next.length }, () => "")];
+        return [
+          ...next,
+          ...Array.from({ length: nextCount - next.length }, () => ""),
+        ];
       }
       return next.slice(0, nextCount);
     });
@@ -137,6 +335,7 @@ export default function AdminWorkbookPage() {
     setDifficulty("");
     setQuestionCategory("");
     setEditingItemId("");
+    setCategoryRecommendations([]);
   };
 
   const loadItems = async (workbookId: string) => {
@@ -151,8 +350,12 @@ export default function AdminWorkbookPage() {
       );
       setItems(list);
       if (!editingItemId) {
-        const cap = workbooks.find((w) => w.id === workbookId)?.questionCount ?? 0;
-        const lastNumber = list.length > 0 ? Math.max(...list.map((item) => item.questionNumber)) : 0;
+        const cap =
+          workbooks.find((w) => w.id === workbookId)?.questionCount ?? 0;
+        const lastNumber =
+          list.length > 0
+            ? Math.max(...list.map((item) => item.questionNumber))
+            : 0;
         if (cap > 0 && list.length >= cap) {
           setQuestionNumber(cap);
         } else {
@@ -174,15 +377,17 @@ export default function AdminWorkbookPage() {
         axios.get<Workbook[]>(`${API_BASE_URL}/admin/questions`, {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
-        axios.get<WorkbookAccuracy[]>(`${API_BASE_URL}/public/workbooks/accuracy`),
+        axios.get<WorkbookAccuracy[]>(
+          `${API_BASE_URL}/public/workbooks/accuracy`,
+        ),
       ]);
       setWorkbooks(Array.isArray(workbookRes.data) ? workbookRes.data : []);
       setAccuracyRows(Array.isArray(accuracyRes.data) ? accuracyRes.data : []);
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "문제집 정보를 불러오지 못했습니다.";
       setMessage(text || "문제집 정보를 불러오지 못했습니다.");
       setMessageTone("error");
@@ -226,9 +431,9 @@ export default function AdminWorkbookPage() {
       await loadData();
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "문제집 생성 실패";
       setMessage(text || "문제집 생성 실패");
       setMessageTone("error");
@@ -269,9 +474,9 @@ export default function AdminWorkbookPage() {
       await loadData();
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "문제집 삭제 실패";
       setMessage(text || "문제집 삭제 실패");
       setMessageTone("error");
@@ -279,7 +484,13 @@ export default function AdminWorkbookPage() {
   };
 
   const saveItem = async () => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin" || !selectedWorkbookId) return;
+    if (
+      !API_BASE_URL ||
+      !auth.token ||
+      authRole !== "admin" ||
+      !selectedWorkbookId
+    )
+      return;
     if (
       !editingItemId &&
       selectedWorkbook &&
@@ -301,7 +512,11 @@ export default function AdminWorkbookPage() {
       return;
     }
     const answerIndex = Number(answerNumber) - 1;
-    if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= choices.length) {
+    if (
+      !Number.isInteger(answerIndex) ||
+      answerIndex < 0 ||
+      answerIndex >= choices.length
+    ) {
       setMessage("정답 번호를 선택해주세요.");
       setMessageTone("error");
       return;
@@ -313,7 +528,7 @@ export default function AdminWorkbookPage() {
     }
     const trimmedQuestionCategory = questionCategory.trim();
     if (!trimmedQuestionCategory) {
-      setMessage("문제 종류를 입력해주세요.");
+      setMessage("문제 종류를 선택해주세요.");
       setMessageTone("error");
       return;
     }
@@ -353,9 +568,9 @@ export default function AdminWorkbookPage() {
       await loadData();
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "문제 저장 실패";
       setMessage(text || "문제 저장 실패");
       setMessageTone("error");
@@ -363,11 +578,73 @@ export default function AdminWorkbookPage() {
       setSavingItem(false);
     }
   };
+
+  const recommendQuestionCategory = async () => {
+    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    const trimmedQuestionDescription = questionDescription.trim();
+    if (!trimmedQuestionDescription) return;
+
+    const allChoices = choiceValues
+      .slice(0, choiceCount)
+      .map((choice) => choice.trim());
+    const choices = allChoices.filter(Boolean);
+    const answerIndex = Number(answerNumber) - 1;
+    const selectedAnswer =
+      Number.isInteger(answerIndex) &&
+      answerIndex >= 0 &&
+      answerIndex < allChoices.length
+        ? allChoices[answerIndex]
+        : "";
+
+    setMessage("");
+    setMessageTone("info");
+    setRecommendingCategory(true);
+    setCategoryRecommendations([]);
+    try {
+      const { data } = await axios.post<CategoryRecommendationResponse[]>(
+        `${API_BASE_URL}/admin/question-categories/recommend`,
+        {
+          questionDescription: trimmedQuestionDescription,
+          choices,
+          answer: selectedAnswer,
+          hint,
+          difficulty,
+          categories: QUESTION_CATEGORY_MAP,
+        },
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+      );
+      const recommendations = Array.isArray(data) ? data : [];
+      setCategoryRecommendations(recommendations);
+      if (recommendations.length > 0) {
+        setQuestionCategory(recommendations[0].category);
+        setMessage(
+          `추천 카테고리 Top 1: ${recommendations[0].category} (${recommendations[0].reason})`,
+        );
+        setMessageTone("success");
+      } else {
+        setMessage("추천 카테고리를 찾지 못했습니다.");
+        setMessageTone("error");
+      }
+    } catch (err) {
+      const text = axios.isAxiosError(err)
+        ? ((Array.isArray(err.response?.data?.message)
+            ? err.response?.data?.message.join(", ")
+            : err.response?.data?.message) ?? err.message)
+        : "카테고리 추천 실패";
+      setMessage(text || "카테고리 추천 실패");
+      setMessageTone("error");
+    } finally {
+      setRecommendingCategory(false);
+    }
+  };
+
   const onSaveItem = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editingItemId) {
       setConfirmMode("saveItemEdit");
-      setConfirmMessage(`${questionNumber}번 문제 수정 내용을 저장하시겠습니까?`);
+      setConfirmMessage(
+        `${questionNumber}번 문제 수정 내용을 저장하시겠습니까?`,
+      );
       setConfirmWorkbookId("");
       setConfirmItemId("");
       setConfirmOpen(true);
@@ -377,15 +654,24 @@ export default function AdminWorkbookPage() {
   };
 
   const onDeleteItem = async (itemId: string) => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin" || !selectedWorkbookId) return;
+    if (
+      !API_BASE_URL ||
+      !auth.token ||
+      authRole !== "admin" ||
+      !selectedWorkbookId
+    )
+      return;
     setMessage("");
     setMessageTone("info");
     try {
       const target = items.find((item) => item.id === itemId);
       const deletedNumber = target?.questionNumber ?? 0;
-      await axios.delete(`${API_BASE_URL}/admin/questions/${selectedWorkbookId}/items/${itemId}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      });
+      await axios.delete(
+        `${API_BASE_URL}/admin/questions/${selectedWorkbookId}/items/${itemId}`,
+        {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        },
+      );
       if (editingItemId === itemId) {
         resetItemForm();
       }
@@ -404,9 +690,9 @@ export default function AdminWorkbookPage() {
       await loadItems(selectedWorkbookId);
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "문제 삭제 실패";
       setMessage(text || "문제 삭제 실패");
       setMessageTone("error");
@@ -443,7 +729,9 @@ export default function AdminWorkbookPage() {
     if (!selectedWorkbook || editingItemId) return false;
     return items.length >= selectedWorkbook.questionCount;
   }, [selectedWorkbook, items.length, editingItemId]);
-  const workbookFormMode = editingWorkbookId ? "문제집 정보 수정 모드" : "새 문제집 생성 모드";
+  const workbookFormMode = editingWorkbookId
+    ? "문제집 정보 수정 모드"
+    : "새 문제집 생성 모드";
   const itemFormMode = !selectedWorkbookId
     ? "문제집 선택 필요"
     : editingItemId
@@ -459,7 +747,10 @@ export default function AdminWorkbookPage() {
     const sum = accuracyRows.reduce((acc, row) => acc + row.accuracy, 0);
     return Number((sum / accuracyRows.length).toFixed(1));
   }, [accuracyRows]);
-  const setWorkbookStatus = async (workbookId: string, status: "draft" | "published") => {
+  const setWorkbookStatus = async (
+    workbookId: string,
+    status: "draft" | "published",
+  ) => {
     if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
     setMessage("");
     setMessageTone("info");
@@ -469,14 +760,18 @@ export default function AdminWorkbookPage() {
         { status },
         { headers: { Authorization: `Bearer ${auth.token}` } },
       );
-      setMessage(status === "published" ? "게시되었습니다." : "게시가 취소되었습니다. (이용자 목록에서 숨깁니다)");
+      setMessage(
+        status === "published"
+          ? "게시되었습니다."
+          : "게시가 취소되었습니다. (이용자 목록에서 숨깁니다)",
+      );
       setMessageTone("success");
       await loadData();
     } catch (err) {
       const text = axios.isAxiosError(err)
-        ? (Array.isArray(err.response?.data?.message)
+        ? ((Array.isArray(err.response?.data?.message)
             ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message
+            : err.response?.data?.message) ?? err.message)
         : "상태를 변경하지 못했습니다.";
       setMessage(text || "상태를 변경하지 못했습니다.");
       setMessageTone("error");
@@ -514,7 +809,11 @@ export default function AdminWorkbookPage() {
   };
 
   if (!isHydrated) {
-    return <main className="flex flex-1 items-center justify-center text-neutral-300">확인 중...</main>;
+    return (
+      <main className="flex flex-1 items-center justify-center text-neutral-300">
+        확인 중...
+      </main>
+    );
   }
 
   if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
@@ -529,10 +828,17 @@ export default function AdminWorkbookPage() {
     return (
       <main className="flex flex-1 items-center justify-center px-4">
         <div className="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-950/70 p-6 text-center">
-          <h1 className="text-lg font-semibold text-neutral-100">Admin 접근 제한</h1>
-          <p className="mt-2 text-sm text-neutral-400">관리자 계정으로 로그인해야 합니다.</p>
+          <h1 className="text-lg font-semibold text-neutral-100">
+            Admin 접근 제한
+          </h1>
+          <p className="mt-2 text-sm text-neutral-400">
+            관리자 계정으로 로그인해야 합니다.
+          </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link href="/login" className="rounded-md border border-neutral-500 px-3 py-1.5 text-sm">
+            <Link
+              href="/login"
+              className="rounded-md border border-neutral-500 px-3 py-1.5 text-sm"
+            >
               로그인
             </Link>
             <Link href="/" className="text-sm text-sky-400 hover:underline">
@@ -549,10 +855,16 @@ export default function AdminWorkbookPage() {
       <aside className="w-60 shrink-0 border-r border-neutral-800 bg-neutral-950 p-4">
         <h1 className="text-base font-semibold">Admin Dashboard</h1>
         <div className="mt-5 flex flex-col gap-2">
-          <Link href="/admin" className="rounded-md border border-neutral-700 px-3 py-2 text-sm">
+          <Link
+            href="/admin"
+            className="rounded-md border border-neutral-700 px-3 py-2 text-sm"
+          >
             통계
           </Link>
-          <Link href="/admin/notice" className="rounded-md border border-neutral-700 px-3 py-2 text-sm">
+          <Link
+            href="/admin/notice"
+            className="rounded-md border border-neutral-700 px-3 py-2 text-sm"
+          >
             공지
           </Link>
           <Link
@@ -600,27 +912,38 @@ export default function AdminWorkbookPage() {
                   <article
                     key={workbook.id}
                     className={`rounded-md border p-3 ${
-                      selected ? "border-sky-500 bg-sky-950/20" : "border-neutral-700 bg-black/40"
+                      selected
+                        ? "border-sky-500 bg-sky-950/20"
+                        : "border-neutral-700 bg-black/40"
                     }`}
                   >
-                    <p className="text-[11px] text-neutral-500">{workbook.certificationType}</p>
-                    <p className="mt-1 text-sm font-medium leading-snug">{workbook.title}</p>
+                    <p className="text-[11px] text-neutral-500">
+                      {workbook.certificationType}
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-snug">
+                      {workbook.title}
+                    </p>
                     <p className="mt-1 text-[10px] font-medium">
                       <span
                         className={
-                          workbook.status === "draft" ? "text-amber-300" : "text-emerald-300/90"
+                          workbook.status === "draft"
+                            ? "text-amber-300"
+                            : "text-emerald-300/90"
                         }
                       >
                         {workbook.status === "draft" ? "게시전" : "게시완료"}
                       </span>
                     </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-neutral-400">{workbook.summary}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-neutral-400">
+                      {workbook.summary}
+                    </p>
                     <p className="mt-1 text-[10px] text-neutral-500">
                       작성일 {formatDateTime(workbook.createdAt)} / 수정일{" "}
                       {formatDateTime(workbook.updatedAt)}
                     </p>
                     <p className="mt-2 text-[11px] text-sky-300/90">
-                      정답률 {accuracy ? `${accuracy.accuracy.toFixed(1)}%` : "-"}
+                      정답률{" "}
+                      {accuracy ? `${accuracy.accuracy.toFixed(1)}%` : "-"}
                       {accuracy ? ` (참여 ${accuracy.attemptCount}명)` : ""}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -709,7 +1032,10 @@ export default function AdminWorkbookPage() {
                 {editingWorkbookId ? "문제집 수정" : "문제집 생성"}
               </h3>
               <p className="mt-1 text-xs text-sky-300">{workbookFormMode}</p>
-              <form onSubmit={onCreateWorkbook} className="mt-3 grid gap-2 md:grid-cols-2">
+              <form
+                onSubmit={onCreateWorkbook}
+                className="mt-3 grid gap-2 md:grid-cols-2"
+              >
                 <input
                   type="text"
                   value={certificationType}
@@ -747,7 +1073,11 @@ export default function AdminWorkbookPage() {
                   disabled={saving}
                   className="cursor-pointer rounded-md border border-amber-500/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "저장 중..." : editingWorkbookId ? "문제집 수정 저장" : "문제집 생성"}
+                  {saving
+                    ? "저장 중..."
+                    : editingWorkbookId
+                      ? "문제집 수정 저장"
+                      : "문제집 생성"}
                 </button>
                 {editingWorkbookId ? (
                   <button
@@ -763,19 +1093,23 @@ export default function AdminWorkbookPage() {
 
             <section className="rounded-lg border border-neutral-700 bg-neutral-950/70 p-4">
               <h3 className="text-base font-semibold">
-                문제 관리 {selectedWorkbook ? `- ${selectedWorkbook.title}` : ""}
+                문제 관리{" "}
+                {selectedWorkbook ? `- ${selectedWorkbook.title}` : ""}
               </h3>
               <p className="mt-1 text-xs text-amber-300">{itemFormMode}</p>
               {atNewItemLimit ? (
                 <p className="mt-2 text-xs text-amber-200/90">
-                  목표 문항 수({selectedWorkbook?.questionCount}문항)를 모두 채웠습니다. 새 문항을 추가하려면 상단에서 목표
-                  문항 수를 늘리거나 기존 문항을 삭제하세요.
+                  목표 문항 수({selectedWorkbook?.questionCount}문항)를 모두
+                  채웠습니다. 새 문항을 추가하려면 상단에서 목표 문항 수를
+                  늘리거나 기존 문항을 삭제하세요.
                 </p>
               ) : null}
               {selectedWorkbook ? (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-neutral-700 bg-black/40 px-3 py-2 text-xs text-neutral-300">
                   <span>선택 문제집: {selectedWorkbook.title}</span>
-                  <span className="text-neutral-500">/ 목표 문항 수 {selectedWorkbook.questionCount}</span>
+                  <span className="text-neutral-500">
+                    / 목표 문항 수 {selectedWorkbook.questionCount}
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -791,7 +1125,10 @@ export default function AdminWorkbookPage() {
               ) : null}
               {selectedWorkbookId ? (
                 <>
-                  <form onSubmit={onSaveItem} className="mt-3 grid gap-2 md:grid-cols-2">
+                  <form
+                    onSubmit={onSaveItem}
+                    className="mt-3 grid gap-2 md:grid-cols-2"
+                  >
                     <input
                       type="number"
                       min={1}
@@ -801,23 +1138,84 @@ export default function AdminWorkbookPage() {
                       className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-300"
                       required
                     />
-                    <input
-                      type="text"
-                      value={questionCategory}
-                      onChange={(e) => setQuestionCategory(e.target.value)}
-                      placeholder="문제 종류"
-                      className="rounded-md border border-neutral-700 bg-black px-3 py-2 text-sm"
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={questionCategory}
+                        onChange={(e) => setQuestionCategory(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-neutral-700 bg-black px-3 py-2 text-sm"
+                        required
+                      >
+                        <option value="">문제 종류 선택</option>
+                        {QUESTION_CATEGORY_MAP.map((category) => (
+                          <option key={category.value} value={category.value}>
+                            {category.value}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={recommendQuestionCategory}
+                        disabled={
+                          !questionDescription.trim() || recommendingCategory
+                        }
+                        className="shrink-0 cursor-pointer rounded-md border border-sky-500/70 bg-sky-950/30 px-3 py-2 text-xs text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={
+                          questionDescription.trim()
+                            ? "기존 문제 임베딩과 비교해 카테고리 Top 3를 추천합니다."
+                            : "문제 설명을 입력하면 추천할 수 있습니다."
+                        }
+                      >
+                        {recommendingCategory ? "추천 중..." : "AI 추천"}
+                      </button>
+                    </div>
+                    {categoryRecommendations.length > 0 ? (
+                      <div className="md:col-span-2 rounded-md border border-sky-700/60 bg-sky-950/20 p-3">
+                        <p className="text-xs font-medium text-sky-200">
+                          임베딩 유사도 기반 카테고리 Top 3
+                        </p>
+                        <div className="mt-2 grid gap-2 md:grid-cols-3">
+                          {categoryRecommendations.map((item, index) => (
+                            <button
+                              key={`${item.category}-${index}`}
+                              type="button"
+                              onClick={() => setQuestionCategory(item.category)}
+                              className={`cursor-pointer rounded-md border px-3 py-2 text-left text-xs transition ${
+                                questionCategory === item.category
+                                  ? "border-sky-400 bg-sky-900/50 text-sky-100"
+                                  : "border-neutral-700 bg-black/40 text-neutral-300 hover:border-sky-500"
+                              }`}
+                            >
+                              <span className="font-semibold">
+                                {index + 1}. {item.category}
+                              </span>
+                              <span className="mt-1 block text-[11px] text-neutral-400">
+                                점수 {(item.score * 100).toFixed(1)}점 · 유사
+                                문제 {item.similarQuestionCount}개
+                              </span>
+                              <span className="mt-1 block text-[11px] text-neutral-500">
+                                최고 {(item.maxSimilarity * 100).toFixed(1)}% /
+                                평균 {(item.averageSimilarity * 100).toFixed(1)}
+                                %
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <textarea
                       value={questionDescription}
-                      onChange={(e) => setQuestionDescription(e.target.value)}
+                      onChange={(e) => {
+                        setQuestionDescription(e.target.value);
+                        setCategoryRecommendations([]);
+                      }}
                       placeholder="문제 설명"
                       className="md:col-span-2 min-h-20 rounded-md border border-neutral-700 bg-black px-3 py-2 text-sm"
                       required
                     />
                     <div className="grid gap-2">
-                      <label className="text-xs text-neutral-400">보기 개수</label>
+                      <label className="text-xs text-neutral-400">
+                        보기 개수
+                      </label>
                       <select
                         value={choiceCount}
                         onChange={(e) => {
@@ -864,8 +1262,13 @@ export default function AdminWorkbookPage() {
                       >
                         <option value="">정답 번호 선택</option>
                         {Array.from({ length: choiceCount }, (_, idx) => (
-                          <option key={`answer-number-${idx + 1}`} value={idx + 1}>
-                            {idx + 1}번 - {(choiceValues[idx] ?? "").trim() || "(보기 내용 입력 필요)"}
+                          <option
+                            key={`answer-number-${idx + 1}`}
+                            value={idx + 1}
+                          >
+                            {idx + 1}번 -{" "}
+                            {(choiceValues[idx] ?? "").trim() ||
+                              "(보기 내용 입력 필요)"}
                           </option>
                         ))}
                       </select>
@@ -896,7 +1299,11 @@ export default function AdminWorkbookPage() {
                       disabled={savingItem || atNewItemLimit}
                       className="cursor-pointer rounded-md border border-amber-500/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {savingItem ? "저장 중..." : editingItemId ? "문제 수정 저장" : "문제 생성"}
+                      {savingItem
+                        ? "저장 중..."
+                        : editingItemId
+                          ? "문제 수정 저장"
+                          : "문제 생성"}
                     </button>
                     {editingItemId ? (
                       <button
@@ -919,7 +1326,8 @@ export default function AdminWorkbookPage() {
                           {item.questionNumber}번. {item.questionDescription}
                         </p>
                         <p className="mt-1 text-xs text-neutral-400">
-                          난이도: {item.difficulty} / 종류: {item.questionCategory} / 정답: {item.answer}
+                          난이도: {item.difficulty} / 종류:{" "}
+                          {item.questionCategory} / 정답: {item.answer}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <button
@@ -928,14 +1336,22 @@ export default function AdminWorkbookPage() {
                               setEditingItemId(item.id);
                               setQuestionNumber(item.questionNumber);
                               setQuestionDescription(item.questionDescription);
-                              const nextChoiceCount = Math.max(2, item.choices.length);
+                              const nextChoiceCount = Math.max(
+                                2,
+                                item.choices.length,
+                              );
                               setChoiceCount(nextChoiceCount);
                               setChoiceValues(item.choices);
-                              const foundIdx = item.choices.findIndex((choice) => choice === item.answer);
-                              setAnswerNumber(foundIdx >= 0 ? String(foundIdx + 1) : "");
+                              const foundIdx = item.choices.findIndex(
+                                (choice) => choice === item.answer,
+                              );
+                              setAnswerNumber(
+                                foundIdx >= 0 ? String(foundIdx + 1) : "",
+                              );
                               setHint(item.hint ?? "");
                               setDifficulty(item.difficulty);
                               setQuestionCategory(item.questionCategory);
+                              setCategoryRecommendations([]);
                             }}
                             className="cursor-pointer rounded border border-neutral-500 px-2 py-1 text-[11px]"
                           >
@@ -945,7 +1361,9 @@ export default function AdminWorkbookPage() {
                             type="button"
                             onClick={() => {
                               setConfirmMode("deleteItem");
-                              setConfirmMessage(`${item.questionNumber}번 문제를 정말 삭제하시겠습니까?`);
+                              setConfirmMessage(
+                                `${item.questionNumber}번 문제를 정말 삭제하시겠습니까?`,
+                              );
                               setConfirmItemId(item.id);
                               setConfirmWorkbookId("");
                               setConfirmOpen(true);
@@ -961,7 +1379,8 @@ export default function AdminWorkbookPage() {
                 </>
               ) : (
                 <p className="mt-3 text-sm text-neutral-400">
-                  왼쪽 목록에서 문제집을 선택하면 문제 CRUD를 사용할 수 있습니다.
+                  왼쪽 목록에서 문제집을 선택하면 문제 CRUD를 사용할 수
+                  있습니다.
                 </p>
               )}
             </section>
@@ -995,10 +1414,15 @@ export default function AdminWorkbookPage() {
               aria-labelledby="admin-confirm-title"
               className="w-full max-w-md rounded-xl border border-neutral-600 bg-neutral-950 p-5 shadow-2xl ring-1 ring-white/10"
             >
-              <h2 id="admin-confirm-title" className="text-lg font-semibold text-neutral-50">
+              <h2
+                id="admin-confirm-title"
+                className="text-lg font-semibold text-neutral-50"
+              >
                 작업 확인
               </h2>
-              <p className="mt-3 text-sm leading-relaxed text-neutral-300">{confirmMessage}</p>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-300">
+                {confirmMessage}
+              </p>
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
