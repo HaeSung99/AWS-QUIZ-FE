@@ -611,8 +611,11 @@ export default function HomeClient() {
                   {isLoggedIn
                     ? weaknessCommentLoading
                       ? "최근 풀이 기록을 바탕으로 AI 약점분석을 불러오는 중입니다..."
-                      : weaknessComment ||
-                        "풀이 기록이 쌓이면 최근 성장 흐름을 반영한 AI 약점 코멘트를 보여드립니다."
+                      : weaknessComment.trim().length > 0
+                        ? weaknessComment
+                        : weaknessProgress && !weaknessProgress.ready
+                          ? `AI 약점 코멘트는 최근 ${weaknessProgress.requiredAttemptCount}문제 풀이 기록이 쌓인 뒤 제공됩니다. (현재 ${weaknessProgress.attemptCount}/${weaknessProgress.requiredAttemptCount})`
+                          : "풀이 기록이 쌓이면 최근 성장 흐름을 반영한 AI 약점 코멘트를 보여드립니다."}
                     : "로그인하면 최근 풀이 기록을 바탕으로 AI 약점 분석을 볼 수 있습니다."}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-fuchsia-100/80">
