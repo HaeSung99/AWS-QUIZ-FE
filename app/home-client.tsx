@@ -647,9 +647,22 @@ export default function HomeClient() {
                   )}
                 </p>
               </div>
-              {isLoggedIn &&
-              !weaknessCommentLoading &&
-              weaknessProgress?.ready ? (
+              {!isLoggedIn ? (
+                <Link
+                  href="/login"
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
+                >
+                  유사 문제 풀기
+                </Link>
+              ) : weaknessCommentLoading ? (
+                <span
+                  title="약점 분석 정보를 불러오는 중입니다."
+                  aria-disabled
+                  className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
+                >
+                  유사 문제 풀기
+                </span>
+              ) : weaknessProgress?.ready ? (
                 <Link
                   href="/Quiz?recommended=weakness"
                   className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
@@ -659,29 +672,14 @@ export default function HomeClient() {
               ) : (
                 <span
                   title={
-                    isLoggedIn
-                      ? weaknessCommentLoading
-                        ? "약점 분석 정보를 불러오는 중입니다."
-                        : weaknessProgress && !weaknessProgress.ready
-                          ? `최근 ${weaknessProgress.requiredAttemptCount}문제 기록을 채운 뒤 이용할 수 있습니다.`
-                          : "로그인 후 이용할 수 있습니다."
-                      : "로그인 후 이용할 수 있습니다."
+                    weaknessProgress
+                      ? `최근 ${weaknessProgress.requiredAttemptCount}문제 기록을 채운 뒤 이용할 수 있습니다.`
+                      : "풀이 기록을 불러오지 못했습니다."
                   }
                   aria-disabled
-                  className={`inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border px-4 py-2 text-xs font-semibold transition ${
-                    isLoggedIn
-                      ? "border-fuchsia-700/40 bg-fuchsia-950/40 text-fuchsia-200/60"
-                      : "border-fuchsia-500/70 bg-fuchsia-500 text-fuchsia-950 opacity-90"
-                  }`}
+                  className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
                 >
-                  {isLoggedIn ? "유사 문제 풀기" : (
-                    <Link
-                      href="/login"
-                      className="-m-4 mx-0 rounded-lg px-4 py-2 text-inherit no-underline hover:brightness-110"
-                    >
-                      유사 문제 풀기
-                    </Link>
-                  )}
+                  유사 문제 풀기
                 </span>
               )}
             </div>
