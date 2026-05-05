@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import Link from "next/link";
+import { formatDateTimeSeoul } from "@/lib/date-kst";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
@@ -59,18 +60,6 @@ const wbLatestTime = (wb: Workbook) => {
   if (!Number.isNaN(u)) return u;
   if (!Number.isNaN(c)) return c;
   return 0;
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "-";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 };
 
 export default function AdminWorkbookPage() {
@@ -775,8 +764,8 @@ export default function AdminWorkbookPage() {
                       {workbook.summary}
                     </p>
                     <p className="mt-1 text-[10px] text-neutral-500">
-                      작성일 {formatDateTime(workbook.createdAt)} / 수정일{" "}
-                      {formatDateTime(workbook.updatedAt)}
+                      작성일 {formatDateTimeSeoul(workbook.createdAt)} / 수정일{" "}
+                      {formatDateTimeSeoul(workbook.updatedAt)}
                     </p>
                     <p className="mt-2 text-[11px] text-sky-300/90">
                       정답률{" "}

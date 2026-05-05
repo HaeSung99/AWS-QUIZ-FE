@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import Link from "next/link";
+import { formatDateTimeSeoul } from "@/lib/date-kst";
 import type { FormEvent } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -18,13 +19,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("ko-KR");
-};
 
 export default function AdminNoticePage() {
   const isHydrated = useSyncExternalStore(subscribeNoop, () => true, () => false);
@@ -241,7 +235,7 @@ export default function AdminNoticePage() {
                   {notice.title}
                 </p>
                 <p className="mt-1 text-neutral-400">{notice.body}</p>
-                <p className="mt-1 text-xs text-neutral-500">작성일: {formatDateTime(notice.createdAt)}</p>
+                <p className="mt-1 text-xs text-neutral-500">작성일: {formatDateTimeSeoul(notice.createdAt)}</p>
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
