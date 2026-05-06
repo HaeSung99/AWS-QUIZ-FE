@@ -5,7 +5,6 @@ import { HeaderAuth } from "@/components/header-auth";
 import {
   SITE_DEFAULT_DESCRIPTION,
   SITE_DEFAULT_TITLE,
-  SITE_FAQ_ITEMS,
   SITE_KEYWORDS,
   SITE_ORIGIN,
 } from "@/lib/seo";
@@ -18,14 +17,7 @@ const structuredData = {
       "@id": `${SITE_ORIGIN}/#website`,
       url: SITE_ORIGIN,
       name: "AWS Quiz KR",
-      alternateName: [
-        "AWS Quiz KR",
-        "awsquizkr",
-        "AWS 퀴즈 KR",
-        "aws saa 퀴즈",
-        "AWS SAA 덤프",
-        "AWS 덤프"
-      ],
+      alternateName: ["AWS Quiz KR", "awsquizkr", "AWS 퀴즈 KR"],
       description: SITE_DEFAULT_DESCRIPTION,
       inLanguage: "ko-KR",
       publisher: { "@id": `${SITE_ORIGIN}/#organization` },
@@ -50,18 +42,6 @@ const structuredData = {
         price: "0",
         priceCurrency: "KRW",
       },
-    },
-    {
-      "@type": "FAQPage",
-      "@id": `${SITE_ORIGIN}/#faq`,
-      mainEntity: SITE_FAQ_ITEMS.map((item) => ({
-        "@type": "Question",
-        name: item.question,
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: item.answer,
-        },
-      })),
     },
   ],
 };

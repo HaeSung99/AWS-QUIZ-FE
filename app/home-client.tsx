@@ -3,7 +3,6 @@
 import axios from "axios";
 import Link from "next/link";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
-import { SITE_FAQ_ITEMS } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -496,19 +495,9 @@ export default function HomeClient() {
                   약점을 찾고, 다음에 풀 문제까지 이어가는 AWS Quiz KR
                 </h1>
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-neutral-300">
-                  한국어 객관식으로{" "}
-                  <strong className="font-medium text-neutral-200">
-                    AWS SAA·aws saa·SAA-C03
-                  </strong>
-                  와 CLF 등 자격증 시험을 준비할 수 있습니다. 검색에서 말하는{" "}
-                  <strong className="font-medium text-neutral-200">
-                    saa 덤프·aws 덤프
-                  </strong>
-                  는 본 서비스에서는{" "}
-                  <strong className="font-medium text-sky-200">
-                    실제 시험 원문 복제가 아닌, 자체 제작 예상문제를 쌓아 둔 문제집
-                  </strong>
-                  을 가리킵니다. 풀이 기록으로 약점 유형·유사 문제·AI 코멘트까지 이어집니다.
+                  한국어 객관식 문제집으로 AWS 자격증 시험 준비를 돕습니다. 풀이
+                  기록을 바탕으로 자주 틀리는 유형과 유사 문제 추천, AI 약점
+                  코멘트까지 한 화면에서 확인할 수 있습니다.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -556,18 +545,11 @@ export default function HomeClient() {
         <div className="grid gap-3 lg:grid-cols-2">
           <section className="rounded-xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
             <h2 className="text-sm font-semibold text-neutral-100">
-              AWS·SAA 예상문제 덤프(문제집)
+              AWS 덤프가 아닌 학습용 연습 문제
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-              실제 시험 문항을 그대로 옮긴 자료가 아니라, 출제 범위와 유형을 바탕으로{" "}
-              <strong className="font-medium text-neutral-300">
-                자체 제작해 축적한 예상문제 덤프
-              </strong>
-              입니다.{" "}
-              <strong className="font-medium text-neutral-300">
-                aws 덤프·saa 덤프
-              </strong>
-              로 찾아오셔도 같은 의미의 한국어 문제집·연습 화면으로 이용할 수 있습니다.
+              실제 시험 덤프나 유출 문제가 아니라, AWS 공식 시험 가이드와 공개
+              문서 범위를 바탕으로 개념 이해와 복습을 돕는 문제를 제공합니다.
             </p>
           </section>
 
@@ -895,30 +877,6 @@ export default function HomeClient() {
               </div>
             </section>
           </div>
-        </section>
-
-        <section
-          className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
-          aria-labelledby="home-faq-heading"
-        >
-          <h2
-            id="home-faq-heading"
-            className="text-sm font-semibold text-neutral-100"
-          >
-            자주 묻는 질문 (AWS SAA·예상문제 덤프)
-          </h2>
-          <dl className="mt-4 space-y-5">
-            {SITE_FAQ_ITEMS.map((item) => (
-              <div key={item.question}>
-                <dt className="text-sm font-medium leading-snug text-neutral-200">
-                  {item.question}
-                </dt>
-                <dd className="mt-2 text-xs leading-relaxed text-neutral-400">
-                  {item.answer}
-                </dd>
-              </div>
-            ))}
-          </dl>
         </section>
       </div>
     </main>
