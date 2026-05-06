@@ -1,6 +1,16 @@
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
+/**
+ * 기본 글자 크기 소폭 확대 — Tailwind text-* 유틸(rem) 전체에 반영됩니다.
+ * 모바일 Safari 자동 축소 완화.
+ */
+html {
+  font-size: 108%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 :root {
   --font-noto-sans-kr: "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
 }

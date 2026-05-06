@@ -546,9 +546,8 @@ export default function HomeClient() {
           </div>
         </section>
 
-        <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-            <section className="flex h-full min-h-[7.7rem] flex-col rounded-2xl border border-fuchsia-700/50 bg-fuchsia-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
-              <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <section className="rounded-2xl border border-fuchsia-700/50 bg-fuchsia-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-fuchsia-200">
@@ -635,37 +634,6 @@ export default function HomeClient() {
                 )}
               </div>
             </section>
-
-          <article className="flex h-full min-h-[7.7rem] flex-col rounded-2xl border border-amber-700/50 bg-amber-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
-            <p className="text-xs font-semibold text-amber-200">
-              현재 테스트 버전 안내
-            </p>
-            <p className="mt-2 flex-1 text-[11px] leading-relaxed text-amber-100/90">
-              데이터 손실 및 보안 이슈에 유의해주세요. 개선사항은 오픈채팅 또는
-              메일로 전달해주시면 감사하겠습니다.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Link
-                href={OPEN_CHAT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded border border-amber-500/70 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-100"
-              >
-                오픈채팅
-              </Link>
-              <button
-                type="button"
-                onClick={() => void onCopyEmail()}
-                className="cursor-pointer rounded border border-neutral-600 bg-black/30 px-2 py-1 text-[11px] text-neutral-200"
-              >
-                메일
-              </button>
-              {copyMessage ? (
-                <span className="text-[11px] text-sky-300">{copyMessage}</span>
-              ) : null}
-            </div>
-          </article>
-        </div>
 
         <section className="grid gap-4 lg:grid-cols-2">
           {renderWeakCategoryList(
@@ -861,6 +829,36 @@ export default function HomeClient() {
             </section>
           </div>
         </section>
+
+        <footer className="rounded-xl border border-neutral-800 bg-neutral-900/50 px-4 py-4 sm:px-5">
+          <p className="text-xs font-semibold text-neutral-200">
+            문의 및 개선 제안
+          </p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-400">
+            서비스 관련 문의, 불편 사항, 기능 개선 아이디어를 받습니다. 오픈채팅
+            또는 메일로 자유롭게 알려 주세요.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Link
+              href={OPEN_CHAT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-sky-600/50 bg-sky-950/30 px-3 py-1.5 text-[11px] font-medium text-sky-200 transition hover:border-sky-500/70 hover:bg-sky-950/50"
+            >
+              오픈채팅
+            </Link>
+            <button
+              type="button"
+              onClick={() => void onCopyEmail()}
+              className="cursor-pointer rounded-lg border border-neutral-600 bg-neutral-950/80 px-3 py-1.5 text-[11px] font-medium text-neutral-200 transition hover:border-neutral-500"
+            >
+              메일 주소 복사
+            </button>
+            {copyMessage ? (
+              <span className="text-[11px] text-sky-300">{copyMessage}</span>
+            ) : null}
+          </div>
+        </footer>
       </div>
     </main>
   );
