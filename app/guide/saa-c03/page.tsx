@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_ORIGIN } from "@/lib/seo";
+import { SITE_ORIGIN, SITE_OG_IMAGE_ALT, SITE_SEARCH_PHRASE_VARIANTS } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "SAA-C03 가이드",
@@ -9,12 +9,29 @@ export const metadata: Metadata = {
   keywords: [
     "SAA-C03",
     "AWS SAA",
+    "aws saa",
+    "AWS saa",
     "Solutions Architect Associate",
     "AWS SAA 준비",
     "AWS SAA 퀴즈",
     "AWS 아키텍트",
+    ...SITE_SEARCH_PHRASE_VARIANTS,
   ],
   alternates: { canonical: `${SITE_ORIGIN}/guide/saa-c03` },
+  openGraph: {
+    title: "SAA-C03 가이드 | AWS Quiz KR",
+    description:
+      "AWS SAA-C03 시험 준비 참고 링크. aws saa·AWS SAA 퀴즈는 메인 문제집에서 연습할 수 있습니다.",
+    url: `${SITE_ORIGIN}/guide/saa-c03`,
+    images: [{ url: `${SITE_ORIGIN}/logo.png`, alt: SITE_OG_IMAGE_ALT }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SAA-C03 가이드 | AWS Quiz KR",
+    description:
+      "AWS Solutions Architect Associate 참고 링크 모음. 한국어 문제집·퀴즈는 메인에서.",
+    images: { url: `${SITE_ORIGIN}/logo.png`, alt: SITE_OG_IMAGE_ALT },
+  },
 };
 
 const SAA_GUIDE_LINKS = [
@@ -54,6 +71,10 @@ const SAA_GUIDE_LINKS = [
 export default function SaaGuidePage() {
   return (
     <main className="min-h-screen bg-black px-4 py-10 text-neutral-100">
+      <p className="sr-only">
+        보충 안내. SAA-C03 참고 링크 목록 페이지입니다. aws saa·AWS SAA 키워드로
+        메인 퀴즈·문제집과 연결됩니다.
+      </p>
       <div className="mx-auto w-full max-w-4xl rounded-xl border border-neutral-700 bg-neutral-950/80 p-6">
         <h1 className="text-xl font-semibold">SAA-C03 가이드</h1>
         <p className="mt-2 text-sm text-neutral-400">

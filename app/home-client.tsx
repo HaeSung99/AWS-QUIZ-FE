@@ -3,6 +3,7 @@
 import axios from "axios";
 import Link from "next/link";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
+import { SITE_SCREEN_READER_SEO_NARRATION } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -483,23 +484,26 @@ export default function HomeClient() {
       className="min-h-screen bg-neutral-950 px-4 py-10 text-neutral-100"
       onClickCapture={() => trackVisitEvent("click")}
     >
+      <p className="sr-only">{SITE_SCREEN_READER_SEO_NARRATION}</p>
       <div className="mx-auto flex w-full max-w-[81rem] flex-col gap-7">
         <section className="overflow-hidden rounded-2xl border border-neutral-800 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(10,10,10,0.98))] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.035)] sm:p-7">
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-            <header className="space-y-4">
-              <div className="inline-flex rounded-full border border-sky-500/30 bg-sky-950/40 px-3 py-1 text-[11px] font-medium text-sky-200">
-                AWS 시험 대비 학습 대시보드
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-neutral-50 sm:text-4xl">
-                  약점을 찾고, 다음에 풀 문제까지 이어가는 AWS Quiz KR
-                </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-neutral-300">
-                  한국어 객관식 문제집으로 AWS 자격증 시험 준비를 돕습니다. 풀이
-                  기록을 바탕으로 자주 틀리는 유형과 유사 문제 추천, AI 약점
-                  코멘트까지 한 화면에서 확인할 수 있습니다.
-                </p>
-              </div>
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+            <div className="flex flex-col gap-4">
+              <header className="space-y-4">
+                <div className="inline-flex rounded-full border border-sky-500/30 bg-sky-950/40 px-3 py-1 text-[11px] font-medium text-sky-200">
+                  AWS 시험 대비 학습 대시보드
+                </div>
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight text-neutral-50 sm:text-4xl">
+                    약점을 찾고, 다음에 풀 문제까지 이어가는 AWS Quiz KR
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-neutral-300">
+                    한국어 객관식 문제집으로 AWS 자격증 시험 준비를 돕습니다. 풀이
+                    기록을 바탕으로 자주 틀리는 유형과 유사 문제 추천, AI 약점
+                    코멘트까지 한 화면에서 확인할 수 있습니다.
+                  </p>
+                </div>
+              </header>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -515,7 +519,7 @@ export default function HomeClient() {
                   문제집 둘러보기
                 </a>
               </div>
-            </header>
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {learningSummaryCards.map((card) => (
@@ -542,26 +546,105 @@ export default function HomeClient() {
           </div>
         </section>
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <section className="rounded-xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
-            <h2 className="text-sm font-semibold text-neutral-100">
-              AWS 덤프가 아닌 학습용 연습 문제
-            </h2>
-            <p className="mt-1 text-xs leading-relaxed text-neutral-400">
-              실제 시험 덤프나 유출 문제가 아니라, AWS 공식 시험 가이드와 공개
-              문서 범위를 바탕으로 개념 이해와 복습을 돕는 문제를 제공합니다.
-            </p>
-          </section>
+        <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+            <section className="flex h-full min-h-[7.7rem] flex-col rounded-2xl border border-fuchsia-700/50 bg-fuchsia-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
+              <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-fuchsia-200">
+                      AI 약점 분석
+                    </h3>
+                    <span className="rounded-full border border-fuchsia-600/50 bg-fuchsia-950/50 px-2 py-0.5 text-[10px] text-fuchsia-100/80">
+                      최근 50문제 기준
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+                    {isLoggedIn
+                      ? weaknessCommentLoading
+                        ? "최근 풀이 기록을 바탕으로 AI 약점분석을 불러오는 중입니다..."
+                        : weaknessComment.trim().length > 0
+                          ? weaknessComment
+                          : weaknessProgress && !weaknessProgress.ready ? (
+                            <>
+                              AI 약점 코멘트는 최근{" "}
+                              {weaknessProgress.requiredAttemptCount}문제 풀이
+                              기록이 쌓인 뒤 제공됩니다. (현재{" "}
+                              {weaknessProgress.attemptCount}/
+                              {weaknessProgress.requiredAttemptCount})
+                            </>
+                          ) : (
+                            "풀이 기록이 쌓이면 최근 성장 흐름을 반영한 AI 약점 코멘트를 보여드립니다."
+                          )
+                      : "로그인하면 최근 풀이 기록을 바탕으로 AI 약점 분석을 볼 수 있습니다."}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-fuchsia-100/80">
+                    {isLoggedIn && weaknessProgress ? (
+                      weaknessProgress.ready ? (
+                        <>
+                          최근 {weaknessProgress.attemptCount}문제 풀이 기록을
+                          기준으로 약점 분석을 제공하고 있습니다.
+                        </>
+                      ) : (
+                        <>
+                          AI 약점분석까지{" "}
+                          {weaknessProgress.remainingAttemptCount}문제 남았습니다.
+                          현재 {weaknessProgress.attemptCount}/
+                          {weaknessProgress.requiredAttemptCount}문제 풀이 기록이
+                          쌓였습니다.
+                        </>
+                      )
+                    ) : (
+                      "AI 약점분석은 최근 50문제 풀이 기록이 쌓이면 제공됩니다."
+                    )}
+                  </p>
+                </div>
+                {!isLoggedIn ? (
+                  <Link
+                    href="/login"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
+                  >
+                    유사 문제 풀기
+                  </Link>
+                ) : weaknessCommentLoading ? (
+                  <span
+                    title="약점 분석 정보를 불러오는 중입니다."
+                    aria-disabled
+                    className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
+                  >
+                    유사 문제 풀기
+                  </span>
+                ) : weaknessProgress?.ready ? (
+                  <Link
+                    href="/Quiz?recommended=weakness"
+                    className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
+                  >
+                    유사 문제 풀기
+                  </Link>
+                ) : (
+                  <span
+                    title={
+                      weaknessProgress
+                        ? `최근 ${weaknessProgress.requiredAttemptCount}문제 기록을 채운 뒤 이용할 수 있습니다.`
+                        : "풀이 기록을 불러오지 못했습니다."
+                    }
+                    aria-disabled
+                    className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
+                  >
+                    유사 문제 풀기
+                  </span>
+                )}
+              </div>
+            </section>
 
-          <article className="rounded-xl border border-amber-700/50 bg-amber-950/20 px-4 py-3">
+          <article className="flex h-full min-h-[7.7rem] flex-col rounded-2xl border border-amber-700/50 bg-amber-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
             <p className="text-xs font-semibold text-amber-200">
               현재 테스트 버전 안내
             </p>
-            <p className="mt-1 text-[11px] leading-relaxed text-amber-100/90">
+            <p className="mt-2 flex-1 text-[11px] leading-relaxed text-amber-100/90">
               데이터 손실 및 보안 이슈에 유의해주세요. 개선사항은 오픈채팅 또는
               메일로 전달해주시면 감사하겠습니다.
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               <Link
                 href={OPEN_CHAT_URL}
                 target="_blank"
@@ -585,94 +668,6 @@ export default function HomeClient() {
         </div>
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-2xl border border-fuchsia-700/50 bg-fuchsia-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)] lg:col-span-2">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-fuchsia-200">
-                    AI 약점 분석
-                  </h2>
-                  <span className="rounded-full border border-fuchsia-600/50 bg-fuchsia-950/50 px-2 py-0.5 text-[10px] text-fuchsia-100/80">
-                    최근 50문제 기준
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-200">
-                  {isLoggedIn
-                    ? weaknessCommentLoading
-                      ? "최근 풀이 기록을 바탕으로 AI 약점분석을 불러오는 중입니다..."
-                      : weaknessComment.trim().length > 0
-                        ? weaknessComment
-                        : weaknessProgress && !weaknessProgress.ready ? (
-                          <>
-                            AI 약점 코멘트는 최근{" "}
-                            {weaknessProgress.requiredAttemptCount}문제 풀이
-                            기록이 쌓인 뒤 제공됩니다. (현재{" "}
-                            {weaknessProgress.attemptCount}/
-                            {weaknessProgress.requiredAttemptCount})
-                          </>
-                        ) : (
-                          "풀이 기록이 쌓이면 최근 성장 흐름을 반영한 AI 약점 코멘트를 보여드립니다."
-                        )
-                    : "로그인하면 최근 풀이 기록을 바탕으로 AI 약점 분석을 볼 수 있습니다."}
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-fuchsia-100/80">
-                  {isLoggedIn && weaknessProgress ? (
-                    weaknessProgress.ready ? (
-                      <>
-                        최근 {weaknessProgress.attemptCount}문제 풀이 기록을
-                        기준으로 약점 분석을 제공하고 있습니다.
-                      </>
-                    ) : (
-                      <>
-                        AI 약점분석까지{" "}
-                        {weaknessProgress.remainingAttemptCount}문제 남았습니다.
-                        현재 {weaknessProgress.attemptCount}/
-                        {weaknessProgress.requiredAttemptCount}문제 풀이 기록이
-                        쌓였습니다.
-                      </>
-                    )
-                  ) : (
-                    "AI 약점분석은 최근 50문제 풀이 기록이 쌓이면 제공됩니다."
-                  )}
-                </p>
-              </div>
-              {!isLoggedIn ? (
-                <Link
-                  href="/login"
-                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
-                >
-                  유사 문제 풀기
-                </Link>
-              ) : weaknessCommentLoading ? (
-                <span
-                  title="약점 분석 정보를 불러오는 중입니다."
-                  aria-disabled
-                  className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
-                >
-                  유사 문제 풀기
-                </span>
-              ) : weaknessProgress?.ready ? (
-                <Link
-                  href="/Quiz?recommended=weakness"
-                  className="inline-flex shrink-0 items-center justify-center rounded-lg border border-fuchsia-500/70 bg-fuchsia-500 px-4 py-2 text-xs font-semibold text-fuchsia-950 transition hover:bg-fuchsia-400"
-                >
-                  유사 문제 풀기
-                </Link>
-              ) : (
-                <span
-                  title={
-                    weaknessProgress
-                      ? `최근 ${weaknessProgress.requiredAttemptCount}문제 기록을 채운 뒤 이용할 수 있습니다.`
-                      : "풀이 기록을 불러오지 못했습니다."
-                  }
-                  aria-disabled
-                  className="inline-flex shrink-0 cursor-not-allowed items-center justify-center rounded-lg border border-fuchsia-700/40 bg-fuchsia-950/40 px-4 py-2 text-xs font-semibold text-fuchsia-200/60"
-                >
-                  유사 문제 풀기
-                </span>
-              )}
-            </div>
-          </section>
           {renderWeakCategoryList(
             "내가 자주 틀리는 유형",
             myWeakCategories,
@@ -689,37 +684,7 @@ export default function HomeClient() {
           )}
         </section>
 
-        <section id="workbooks" className="space-y-3">
-          <div className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-neutral-100">
-                문제집 선택
-              </h2>
-              <p className="mt-1 text-xs text-neutral-500">
-                최신 문제집을 먼저 보여줍니다. 필요한 문제집은 제목으로
-                검색하세요.
-              </p>
-            </div>
-            <div className="w-full sm:max-w-sm">
-              <label htmlFor="main-search" className="sr-only">
-                문제집 검색
-              </label>
-              <input
-                id="main-search"
-                type="search"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  if (e.target.value.trim()) {
-                    trackVisitEvent("search_input");
-                  }
-                }}
-                placeholder="문제집 제목 검색 (예: SAA)"
-                className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none ring-sky-600/40 focus:border-sky-500 focus:ring-2"
-              />
-            </div>
-          </div>
-
+        <section id="workbooks">
           <div className="grid gap-4 xl:grid-cols-[0.75fr_1.25fr]">
             <div className="grid gap-4">
               <section className="flex min-h-0 flex-col rounded-xl border border-neutral-800 bg-neutral-900/70 p-4">
@@ -797,8 +762,8 @@ export default function HomeClient() {
             </div>
 
             <section className="flex min-h-[520px] flex-col rounded-xl border border-neutral-800 bg-neutral-900/70 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
                     문제집
                   </h2>
@@ -806,11 +771,29 @@ export default function HomeClient() {
                     검색어와 일치하는 문제집 목록입니다.
                   </p>
                 </div>
-                {!search.trim() && filteredWorkbooks.length > 12 ? (
-                  <span className="rounded-full border border-neutral-700 bg-neutral-950 px-2 py-0.5 text-[10px] text-neutral-500">
-                    최근 12개 표시
-                  </span>
-                ) : null}
+                <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:max-w-xs sm:items-end">
+                  <label htmlFor="main-search" className="sr-only">
+                    문제집 검색
+                  </label>
+                  <input
+                    id="main-search"
+                    type="search"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      if (e.target.value.trim()) {
+                        trackVisitEvent("search_input");
+                      }
+                    }}
+                    placeholder="문제집 제목 검색 (예: SAA)"
+                    className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none ring-sky-600/40 focus:border-sky-500 focus:ring-2"
+                  />
+                  {!search.trim() && filteredWorkbooks.length > 12 ? (
+                    <span className="rounded-full border border-neutral-700 bg-neutral-950 px-2 py-0.5 text-[10px] text-neutral-500 sm:self-end">
+                      최근 12개 표시
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-0.5">

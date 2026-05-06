@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_ORIGIN } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "이용약관",
+  description: "AWS Quiz KR 서비스 이용약관. 이용 조건 및 책임 안내.",
+  alternates: { canonical: `${SITE_ORIGIN}/terms` },
+};
 
 export default function TermsPage() {
   return (

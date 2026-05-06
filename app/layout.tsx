@@ -6,7 +6,9 @@ import {
   SITE_DEFAULT_DESCRIPTION,
   SITE_DEFAULT_TITLE,
   SITE_KEYWORDS,
+  SITE_OG_IMAGE_ALT,
   SITE_ORIGIN,
+  SITE_SEARCH_PHRASE_VARIANTS,
 } from "@/lib/seo";
 
 const structuredData = {
@@ -17,7 +19,12 @@ const structuredData = {
       "@id": `${SITE_ORIGIN}/#website`,
       url: SITE_ORIGIN,
       name: "AWS Quiz KR",
-      alternateName: ["AWS Quiz KR", "awsquizkr", "AWS 퀴즈 KR"],
+      alternateName: [
+        "AWS Quiz KR",
+        "awsquizkr",
+        "AWS 퀴즈 KR",
+        ...SITE_SEARCH_PHRASE_VARIANTS,
+      ],
       description: SITE_DEFAULT_DESCRIPTION,
       inLanguage: "ko-KR",
       publisher: { "@id": `${SITE_ORIGIN}/#organization` },
@@ -27,6 +34,7 @@ const structuredData = {
       "@id": `${SITE_ORIGIN}/#organization`,
       name: "AWS Quiz KR",
       url: SITE_ORIGIN,
+      logo: `${SITE_ORIGIN}/logo.png`,
     },
     {
       "@type": "WebApplication",
@@ -54,11 +62,8 @@ export const metadata: Metadata = {
   },
   description: SITE_DEFAULT_DESCRIPTION,
   keywords: SITE_KEYWORDS,
-  alternates: {
-    canonical: SITE_ORIGIN,
-  },
   openGraph: {
-    title: "AWS Quiz KR",
+    title: SITE_DEFAULT_TITLE,
     description: SITE_DEFAULT_DESCRIPTION,
     url: SITE_ORIGIN,
     siteName: "AWS Quiz KR",
@@ -67,6 +72,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: `${SITE_ORIGIN}/logo.png`,
+        alt: SITE_OG_IMAGE_ALT,
       },
     ],
   },
@@ -74,6 +80,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_DEFAULT_TITLE,
     description: SITE_DEFAULT_DESCRIPTION.slice(0, 200),
+    images: {
+      url: `${SITE_ORIGIN}/logo.png`,
+      alt: SITE_OG_IMAGE_ALT,
+    },
   },
   robots: {
     index: true,
