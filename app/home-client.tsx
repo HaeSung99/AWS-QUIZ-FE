@@ -10,6 +10,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const NOTICE_HOME_MAX = 4;
+/** 문제집 목록 페이지당 개수 (초과 시 페이지네이션) */
+const WORKBOOK_PAGE_SIZE = 10;
 const OPEN_CHAT_URL = "https://open.kakao.com/o/spyj5doi";
 const CONTACT_EMAIL = "inseok1999@gmail.com";
 const SITE_CERT_GUIDE = {
@@ -80,6 +82,7 @@ const workbookLatestTime = (w: WorkbookItem) => {
 
 export default function HomeClient() {
   const [search, setSearch] = useState("");
+  const [workbookPage, setWorkbookPage] = useState(1);
   const [noticeItems, setNoticeItems] = useState<NoticeItem[]>([]);
   const [workbookItems, setWorkbookItems] = useState<WorkbookItem[]>([]);
   const [workbookAccuracyMap, setWorkbookAccuracyMap] = useState<
@@ -324,13 +327,40 @@ export default function HomeClient() {
     if (!q) return workbookItems;
     return workbookItems.filter((w) => w.title.toLowerCase().includes(q));
   }, [search, workbookItems]);
+
+  const sortedFilteredWorkbooks = useMemo(
+    () =>
+      [...filteredWorkbooks].sort(
+        (a, b) => workbookLatestTime(b) - workbookLatestTime(a),
+      ),
+    [filteredWorkbooks],
+  );
+
+  const workbookTotalPages = useMemo(
+    () =>
+      Math.max(
+        1,
+        Math.ceil(sortedFilteredWorkbooks.length / WORKBOOK_PAGE_SIZE),
+      ),
+    [sortedFilteredWorkbooks.length],
+  );
+
+  useEffect(() => {
+    setWorkbookPage((p) => Math.min(Math.max(1, p), workbookTotalPages));
+  }, [workbookTotalPages]);
+
   const displayedWorkbooks = useMemo(() => {
-    const sorted = [...filteredWorkbooks].sort(
-      (a, b) => workbookLatestTime(b) - workbookLatestTime(a),
-    );
-    if (search.trim()) return sorted;
-    return sorted.slice(0, 12);
-  }, [filteredWorkbooks, search]);
+    const start = (workbookPage - 1) * WORKBOOK_PAGE_SIZE;
+    return sortedFilteredWorkbooks.slice(start, start + WORKBOOK_PAGE_SIZE);
+  }, [sortedFilteredWorkbooks, workbookPage]);
+
+  const workbookRangeLabel = useMemo(() => {
+    const total = sortedFilteredWorkbooks.length;
+    if (total === 0) return "";
+    const from = (workbookPage - 1) * WORKBOOK_PAGE_SIZE + 1;
+    const to = Math.min(workbookPage * WORKBOOK_PAGE_SIZE, total);
+    return `${from}–${to} / 전체 ${total}개`;
+  }, [sortedFilteredWorkbooks.length, workbookPage]);
   const topWeakCategory = myWeakCategories[0] ?? null;
   const learningSummaryCards = [
     {
@@ -546,6 +576,51 @@ export default function HomeClient() {
           </div>
         </section>
 
+        <section
+          className="rounded-2xl border border-emerald-600/45 bg-emerald-950/25 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
+          aria-labelledby="home-event-heading"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p
+                id="home-event-heading"
+                className="text-xs font-semibold uppercase tracking-wide text-emerald-200"
+              >
+                이벤트 (2026-05-06 ~ 진행중)
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-100">
+                이용후기와 자격증 취득 인증, 서비스 이용 인증 샷을 오픈채팅으로
+                보내주시면 메가커피 아메리카노 기프티콘을 드리고 있습니다.
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-emerald-100/90">
+                서비스 후기에 사용 가능한 경우에 한해 제공합니다.{" "}
+                <strong className="font-medium text-emerald-50">
+                  동의해 주신 분만
+                </strong>{" "}
+                대상입니다.
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-emerald-100/90">
+                <strong className="font-medium text-emerald-50">안내사항</strong>
+                {": "}
+                이벤트는 조기 종료될 수 있으며,
+                문제집을{" "}
+                <strong className="font-medium text-emerald-50">
+                  10개 이상 풀어본 분만
+                </strong>{" "}
+                참여할 수 있습니다.
+              </p>
+            </div>
+            <Link
+              href={OPEN_CHAT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-emerald-500/80 bg-emerald-500 px-4 py-2.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-400"
+            >
+              오픈채팅
+            </Link>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-fuchsia-700/50 bg-fuchsia-950/20 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.025)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -749,6 +824,7 @@ export default function HomeClient() {
                     value={search}
                     onChange={(e) => {
                       setSearch(e.target.value);
+                      setWorkbookPage(1);
                       if (e.target.value.trim()) {
                         trackVisitEvent("search_input");
                       }
@@ -756,9 +832,9 @@ export default function HomeClient() {
                     placeholder="문제집 제목 검색 (예: SAA)"
                     className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none ring-sky-600/40 focus:border-sky-500 focus:ring-2"
                   />
-                  {!search.trim() && filteredWorkbooks.length > 12 ? (
+                  {sortedFilteredWorkbooks.length > WORKBOOK_PAGE_SIZE ? (
                     <span className="rounded-full border border-neutral-700 bg-neutral-950 px-2 py-0.5 text-[10px] text-neutral-500 sm:self-end">
-                      최근 12개 표시
+                      페이지당 {WORKBOOK_PAGE_SIZE}개
                     </span>
                   ) : null}
                 </div>
@@ -770,7 +846,8 @@ export default function HomeClient() {
                     검색 결과가 없습니다.
                   </p>
                 ) : (
-                  <ul className="grid gap-2">
+                  <>
+                    <ul className="grid gap-2">
                     {displayedWorkbooks.map((workbook) => {
                       const solved = solvedWorkbookIds.includes(workbook.id);
                       const accuracy = workbookAccuracyMap[workbook.id];
@@ -824,6 +901,44 @@ export default function HomeClient() {
                       );
                     })}
                   </ul>
+                    {sortedFilteredWorkbooks.length > WORKBOOK_PAGE_SIZE ? (
+                      <nav
+                        className="mt-4 flex flex-col gap-2 border-t border-neutral-800 pt-3 sm:flex-row sm:items-center sm:justify-between"
+                        aria-label="문제집 페이지"
+                      >
+                        <p className="text-[11px] text-neutral-500">
+                          {workbookRangeLabel}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={workbookPage <= 1}
+                            onClick={() =>
+                              setWorkbookPage((p) => Math.max(1, p - 1))
+                            }
+                            className="rounded-lg border border-neutral-600 bg-neutral-950 px-3 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            이전
+                          </button>
+                          <span className="text-xs tabular-nums text-neutral-400">
+                            {workbookPage} / {workbookTotalPages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={workbookPage >= workbookTotalPages}
+                            onClick={() =>
+                              setWorkbookPage((p) =>
+                                Math.min(workbookTotalPages, p + 1),
+                              )
+                            }
+                            className="rounded-lg border border-neutral-600 bg-neutral-950 px-3 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-neutral-500 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            다음
+                          </button>
+                        </div>
+                      </nav>
+                    ) : null}
+                  </>
                 )}
               </div>
             </section>
