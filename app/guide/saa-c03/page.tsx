@@ -3,12 +3,15 @@ import Link from "next/link";
 import { SITE_ORIGIN } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "SAA-C03 가이드",
+  title: "SAA-C03 가이드 | aws saa·AWS SAA·예상문제 덤프 연습",
   description:
-    "AWS Solutions Architect Associate(SAA-C03) 시험 준비 참고 링크 모음. SAA 퀴즈·문제와 함께 보면 좋은 주제별 정리. AWS SAA 준비, 아키텍트 자격증 학습.",
+    "AWS Solutions Architect Associate(SAA-C03) 준비 참고 링크 모음. aws saa, AWS SAA 예상문제 덤프·문제집과 함께 보기 좋은 주제별 정리입니다. 실제 시험 원문 복제가 아닌 자체 제작 문항 안내.",
   keywords: [
     "SAA-C03",
     "AWS SAA",
+    "aws saa",
+    "saa 덤프",
+    "예상문제 덤프",
     "Solutions Architect Associate",
     "AWS SAA 준비",
     "AWS SAA 퀴즈",
@@ -57,7 +60,8 @@ export default function SaaGuidePage() {
       <div className="mx-auto w-full max-w-4xl rounded-xl border border-neutral-700 bg-neutral-950/80 p-6">
         <h1 className="text-xl font-semibold">SAA-C03 가이드</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          아래 내용은 학습을 돕기 위한 참고용 가이드입니다.
+          aws saa·AWS SAA 시험 준비 참고 링크입니다. 메인의 예상문제 덤프(문제집)는 실제 시험 원문을
+          그대로 옮긴 것이 아니라 자체 제작 문항이며, 가이드와 함께 보시면 좋습니다.
         </p>
 
         <ul className="mt-5 space-y-2">
