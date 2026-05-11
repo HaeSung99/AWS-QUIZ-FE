@@ -67,14 +67,22 @@ export const SITE_KEYWORDS: string[] = [
 ];
 
 export const SITE_DEFAULT_TITLE =
-  "AWS Quiz KR | AWS 자격증 SAA·CLF 퀴즈·문제집 (한국어)";
+  "AWS Quiz KR | AWS 자격증 SAA·CLF 한국어 퀴즈·문제집";
 
 export const SITE_DEFAULT_DESCRIPTION =
-  "AWS 자격증(SAA-C03, CLF-C02 등) 준비용 한국어 퀴즈·문제집 서비스입니다. " +
-  "Solutions Architect·Cloud Practitioner 시험 범위를 바탕으로 한 객관식 문제로 실전 감각을 익히고, " +
-  "문제집별 정답률·풀이 완료를 확인할 수 있습니다. " +
-  "AWS 문제·SAA·CLF 퀴즈·시험 준비·연습문제·모의고사를 찾는 분께 도움이 되도록 구성했습니다. " +
-  "실제 시험 덤프를 제공하지 않으며, 이해·연습 목적의 자체 학습용 문항을 제공합니다.";
+  "AWS 자격증(SAA-C03, CLF-C02 등)과 Solutions Architect·Cloud Practitioner 준비를 위한 한국어 문제집입니다. " +
+  "시험 가이드 범위에 맞춰 제작한 AWS 덤프 형식의 연습문제를 풀며 준비할 수 있고, 풀이 기록·유사 문제 추천·약점 분석을 제공합니다. " +
+  "실제 시험 공식 문항이나 정답은 포함하지 않고, 시험에 도움이 되도록 자체 작성한 예상문제입니다.";
+
+/** 메인 히어로 첫 문단 (대문) */
+export const SITE_HOME_HERO_LEDE =
+  "AWS 자격증 시험 기준에 맞춰 제작한 AWS 덤프 형식의 한국어 문제를 풀어 보며 SAA·Cloud Practitioner 등 자격증 준비를 이어 가 보세요. " +
+  "풀이 기록을 바탕으로 한 유사 문제 추천과 AI 약점 코멘트까지 한 화면에서 확인할 수 있습니다.";
+
+/** 메인 하단 고지 (유출·공식 문항 아님) */
+export const SITE_HOME_CONTENT_NOTICE =
+  "AWS Quiz KR의 문제와 해설에는 실제 AWS 자격증 시험에 출제된 공식 문항이나 그 정답이 포함되어 있지 않습니다. " +
+  "시험 가이드 범위와 학습에 참고할 수 있는 내용을 바탕으로, 시험 준비에 도움이 되도록 자체 제작한 연습·예상문제입니다.";
 
 /** Open Graph·Twitter 카드 등 공유 이미지용 대체 텍스트 */
 export const SITE_OG_IMAGE_ALT =
@@ -85,7 +93,5 @@ export const SITE_OG_IMAGE_ALT =
  * 검색 표기(aws saa, AWS 덤프 등)는 메타 키워드·본 서술과 함께 쓰입니다.
  */
 export const SITE_SCREEN_READER_SEO_NARRATION =
-  "보충 안내. 이 페이지는 AWS Quiz KR의 메인 학습 화면입니다. " +
-  "aws saa, AWS SAA, aws Saa처럼 표기만 다른 검색어도 같은 사이트를 가리킵니다. " +
-  "AWS 덤프·aws 덤프·saa 덤프 또는 영문 aws dump로 찾아오신 경우에도, 여기서는 시험 범위에 맞춘 예상문제 형태의 한국어 문제집·퀴즈를 제공하며, 공식 시험 원문 복제가 아닌 자체 작성 학습 문항입니다. " +
-  "SAA-C03, CLF-C02 문제집 풀이, 오늘의 문제, 약점 유형·유사 문제 추천을 이용할 수 있습니다.";
+  "메인 학습 화면입니다. 시험 가이드에 맞춘 자체 제작 덤프 형식 연습문항이며, 하단 안내처럼 공식 시험 원문·정답은 포함하지 않습니다. " +
+  "오늘의 문제, 약점 분석, 문제집 목록을 이용할 수 있습니다.";

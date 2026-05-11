@@ -3,7 +3,11 @@
 import axios from "axios";
 import Link from "next/link";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
-import { SITE_SCREEN_READER_SEO_NARRATION } from "@/lib/seo";
+import {
+  SITE_HOME_CONTENT_NOTICE,
+  SITE_HOME_HERO_LEDE,
+  SITE_SCREEN_READER_SEO_NARRATION,
+} from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -528,9 +532,7 @@ export default function HomeClient() {
                     약점을 찾고, 다음에 풀 문제까지 이어가는 AWS Quiz KR
                   </h1>
                   <p className="mt-3 max-w-3xl text-sm leading-7 text-neutral-300">
-                    한국어 객관식 문제집으로 AWS 자격증 시험 준비를 돕습니다. 풀이
-                    기록을 바탕으로 자주 틀리는 유형과 유사 문제 추천, AI 약점
-                    코멘트까지 한 화면에서 확인할 수 있습니다.
+                    {SITE_HOME_HERO_LEDE}
                   </p>
                 </div>
               </header>
@@ -943,6 +945,22 @@ export default function HomeClient() {
               </div>
             </section>
           </div>
+        </section>
+
+        <section
+          id="content-notice"
+          aria-labelledby="home-content-notice-heading"
+          className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 sm:px-5"
+        >
+          <h2
+            id="home-content-notice-heading"
+            className="text-xs font-semibold text-neutral-300"
+          >
+            학습 자료 안내
+          </h2>
+          <p className="mt-2 text-[11px] leading-relaxed text-neutral-500">
+            {SITE_HOME_CONTENT_NOTICE}
+          </p>
         </section>
 
         <footer className="rounded-xl border border-neutral-800 bg-neutral-900/50 px-4 py-4 sm:px-5">
