@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Script from "next/script";
 import "./globals.css";
 import { HeaderAuth } from "@/components/header-auth";
 import {
@@ -95,6 +94,9 @@ export const metadata: Metadata = {
       "naver-site-verification": "5d2a1342267a275219e51b8bacc43f58feef2caf",
     },
   },
+  other: {
+    "google-adsense-account": "ca-pub-6105668975420119",
+  },
 };
 
 export default function RootLayout({
@@ -105,11 +107,6 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-black text-neutral-100">
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6105668975420119"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
