@@ -67,7 +67,7 @@ export const SITE_KEYWORDS: string[] = [
 ];
 
 export const SITE_DEFAULT_TITLE =
-  "AWS Quiz KR | AWS 자격증 SAA·CLF 한국어 퀴즈·문제집";
+  "AWS Quiz KR | AWS 자격증 문제 AWS SAA 덤프 AWS 퀴즈";
 
 export const SITE_DEFAULT_DESCRIPTION =
   "AWS 자격증(SAA-C03, CLF-C02 등)과 Solutions Architect·Cloud Practitioner 준비를 위한 한국어 문제집입니다. " +
