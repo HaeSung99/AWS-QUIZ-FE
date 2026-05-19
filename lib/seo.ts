@@ -86,7 +86,7 @@ export const SITE_HOME_CONTENT_NOTICE =
 
 /** Open Graph·Twitter 카드 등 공유 이미지용 대체 텍스트 */
 export const SITE_OG_IMAGE_ALT =
-  "AWS Quiz KR 로고 — AWS 자격증 SAA·CLF 한국어 퀴즈·문제집 서비스";
+  "AWS Quiz KR 로고 — AWS 자격증 문제 AWS SAA 덤프 AWS 퀴즈";
 
 /**
  * 스크린 리더 전용(sr-only) 보충 서술. 시각적으로는 숨기고 접근성·색인 보조에 활용합니다.

@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  AUTH_STORAGE_CHANGED_EVENT,
+  notifyAuthStorageChanged,
+} from "@/lib/auth-client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -44,8 +48,10 @@ function subscribeToAuthStore(onStoreChange: () => void) {
   }
 
   window.addEventListener("storage", onStoreChange);
+  window.addEventListener(AUTH_STORAGE_CHANGED_EVENT, onStoreChange);
   return () => {
     window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(AUTH_STORAGE_CHANGED_EVENT, onStoreChange);
   };
 }
 
@@ -65,6 +71,7 @@ export function HeaderAuth() {
     }
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
+    notifyAuthStorageChanged();
     router.push("/");
     router.refresh();
   };

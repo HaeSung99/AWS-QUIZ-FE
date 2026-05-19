@@ -1,5 +1,6 @@
 "use client";
 
+import { notifyAuthStorageChanged } from "@/lib/auth-client";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -40,6 +41,7 @@ export default function LoginPage() {
 
       localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+      notifyAuthStorageChanged();
       router.push("/");
       router.refresh();
     } catch (err) {

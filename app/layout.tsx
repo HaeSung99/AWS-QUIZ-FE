@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { AuthSessionValidator } from "@/components/auth-session-validator";
 import { HeaderAuth } from "@/components/header-auth";
 import {
   SITE_DEFAULT_DESCRIPTION,
@@ -111,6 +112,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
+        <AuthSessionValidator />
         <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-neutral-800 bg-black/90 px-4 py-3 backdrop-blur-sm">
           <Link href="/" className="text-base font-semibold text-neutral-100 transition hover:text-sky-300">
             AWS Quiz KR

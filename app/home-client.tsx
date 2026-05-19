@@ -2,6 +2,10 @@
 
 import axios from "axios";
 import Link from "next/link";
+import {
+  AUTH_STORAGE_CHANGED_EVENT,
+  clearClientAuthStorage,
+} from "@/lib/auth-client";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
 import {
   SITE_HOME_CONTENT_NOTICE,
@@ -76,6 +80,12 @@ type StoredUser = {
   solvedWorkbookIds?: string[];
 };
 
+function clearAuthIfUnauthorized(err: unknown) {
+  if (axios.isAxiosError(err) && err.response?.status === 401) {
+    clearClientAuthStorage();
+  }
+}
+
 const workbookLatestTime = (w: WorkbookItem) => {
   const u = w.updatedAt ? new Date(w.updatedAt).getTime() : NaN;
   const c = w.createdAt ? new Date(w.createdAt).getTime() : NaN;
@@ -113,6 +123,31 @@ export default function HomeClient() {
   const [showDailyCertModal, setShowDailyCertModal] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
   const sentVisitEventsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !ACCESS_TOKEN_KEY) return;
+
+    const syncLoginFromStorage = () => {
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      const loggedIn = Boolean(token);
+      setIsLoggedIn(loggedIn);
+      if (!loggedIn) {
+        setSolvedWorkbookIds([]);
+        setTargetCertificationType(null);
+        setMyWeakCategories([]);
+        setGlobalWeakCategories([]);
+        setWeaknessComment("");
+        setWeaknessProgress(null);
+      }
+    };
+
+    window.addEventListener(AUTH_STORAGE_CHANGED_EVENT, syncLoginFromStorage);
+    return () =>
+      window.removeEventListener(
+        AUTH_STORAGE_CHANGED_EVENT,
+        syncLoginFromStorage,
+      );
+  }, []);
 
   const getClientKey = useCallback(() => {
     if (typeof window === "undefined") return "";
@@ -187,7 +222,8 @@ export default function HomeClient() {
         ]);
         setMyWeakCategories(Array.isArray(personal.data) ? personal.data : []);
         setGlobalWeakCategories(Array.isArray(global.data) ? global.data : []);
-      } catch {
+      } catch (err) {
+        clearAuthIfUnauthorized(err);
         setMyWeakCategories([]);
         setGlobalWeakCategories([]);
       } finally {
@@ -211,7 +247,8 @@ export default function HomeClient() {
           remainingAttemptCount: data.remainingAttemptCount,
           ready: data.ready,
         });
-      } catch {
+      } catch (err) {
+        clearAuthIfUnauthorized(err);
         setWeaknessComment("");
         setWeaknessProgress(null);
       } finally {
@@ -290,7 +327,6 @@ export default function HomeClient() {
     if (!token || !rawUser) return;
 
     void (async () => {
-      setIsLoggedIn(Boolean(token));
       try {
         const parsed = JSON.parse(rawUser) as StoredUser;
         if (Array.isArray(parsed.solvedWorkbookIds)) {
@@ -314,6 +350,7 @@ export default function HomeClient() {
           : [];
         setSolvedWorkbookIds(solved);
         setTargetCertificationType(data.user?.targetCertificationType ?? null);
+        setIsLoggedIn(true);
 
         if (data.user) {
           localStorage.setItem(
@@ -321,7 +358,12 @@ export default function HomeClient() {
             JSON.stringify({ ...data.user, solvedWorkbookIds: solved }),
           );
         }
-      } catch {}
+      } catch (err) {
+        clearAuthIfUnauthorized(err);
+        setIsLoggedIn(false);
+        setSolvedWorkbookIds([]);
+        setTargetCertificationType(null);
+      }
     })();
   }, []);
 
