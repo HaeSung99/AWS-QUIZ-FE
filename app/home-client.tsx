@@ -102,6 +102,8 @@ export default function HomeClient() {
   const [workbookAccuracyMap, setWorkbookAccuracyMap] = useState<
     Record<string, number>
   >({});
+  const [personalWorkbookAccuracyMap, setPersonalWorkbookAccuracyMap] =
+    useState<Record<string, number>>({});
   const [myWeakCategories, setMyWeakCategories] = useState<WeakCategoryItem[]>(
     [],
   );
@@ -138,6 +140,7 @@ export default function HomeClient() {
         setGlobalWeakCategories([]);
         setWeaknessComment("");
         setWeaknessProgress(null);
+        setPersonalWorkbookAccuracyMap({});
       }
     };
 
@@ -148,6 +151,49 @@ export default function HomeClient() {
         syncLoginFromStorage,
       );
   }, []);
+
+  const fetchPersonalWorkbookAccuracy = useCallback(() => {
+    if (
+      !API_BASE_URL ||
+      !ACCESS_TOKEN_KEY ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) {
+      setPersonalWorkbookAccuracyMap({});
+      return;
+    }
+    void (async () => {
+      try {
+        const { data } = await axios.get<{
+          workbooks: { workbookId: string; accuracy: number }[];
+        }>(`${API_BASE_URL}/auth/me/learning-stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const m: Record<string, number> = {};
+        for (const row of Array.isArray(data.workbooks) ? data.workbooks : []) {
+          m[row.workbookId] = row.accuracy;
+        }
+        setPersonalWorkbookAccuracyMap(m);
+      } catch (err) {
+        clearAuthIfUnauthorized(err);
+        setPersonalWorkbookAccuracyMap({});
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    fetchPersonalWorkbookAccuracy();
+    window.addEventListener(AUTH_STORAGE_CHANGED_EVENT, fetchPersonalWorkbookAccuracy);
+    return () => {
+      window.removeEventListener(
+        AUTH_STORAGE_CHANGED_EVENT,
+        fetchPersonalWorkbookAccuracy,
+      );
+    };
+  }, [fetchPersonalWorkbookAccuracy]);
 
   const getClientKey = useCallback(() => {
     if (typeof window === "undefined") return "";
@@ -920,10 +966,25 @@ export default function HomeClient() {
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-500">
                                 <span className="text-sky-300/90">
-                                  평균 정답률{" "}
+                                  전체 평균{" "}
                                   {typeof accuracy === "number"
                                     ? `${accuracy.toFixed(1)}%`
                                     : "-"}
+                                  {isLoggedIn ? (
+                                    <span className="text-neutral-400">
+                                      {" "}
+                                      · 내 최초 제출{" "}
+                                      {typeof personalWorkbookAccuracyMap[
+                                        workbook.id
+                                      ] === "number"
+                                        ? `${personalWorkbookAccuracyMap[
+                                            workbook.id
+                                          ].toFixed(1)}%`
+                                        : solved
+                                          ? "-"
+                                          : "—"}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span>
                                   수정일 {formatDateTimeSeoul(workbook.updatedAt)}

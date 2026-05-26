@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
@@ -44,6 +44,70 @@ type UserProfile = {
   solvedWorkbookIds?: string[];
 };
 
+type LearningStats = {
+  overall: {
+    totalCount: number;
+    correctCount: number;
+    accuracy: number | null;
+  };
+  workbooks: Array<{
+    workbookId: string;
+    title: string;
+    accuracy: number;
+    sessionCount: number;
+    correctCount: number;
+    totalCount: number;
+  }>;
+};
+
+type WorkbookBrief = {
+  id: string;
+  title: string;
+  certificationType?: string;
+};
+
+type WorkbookAccuracyRow = {
+  workbookId: string;
+  accuracy: number;
+  attemptCount: number;
+};
+
+type ReviewItem = {
+  questionId: string;
+  questionNumber: number;
+  questionDescription: string;
+  choices: string[];
+  difficulty: string;
+  questionCategory: string;
+  selectedAnswer: string | null;
+  correctAnswer: string;
+  isCorrect: boolean;
+};
+
+type ReviewSession = {
+  submittedAt: string;
+  accuracy: number;
+  correctCount: number;
+  totalCount: number;
+  items: ReviewItem[];
+};
+
+type WorkbookReviewResponse = {
+  workbookId: string;
+  title: string;
+  sessions: ReviewSession[];
+};
+
+function formatChoiceLine(
+  choices: string[],
+  answer: string | null | undefined,
+): string {
+  if (answer === null || answer === undefined || answer === "") return "미응답";
+  const idx = choices.findIndex((c) => c === answer);
+  if (idx < 0) return answer;
+  return `${idx + 1}. ${answer}`;
+}
+
 function getAuthHeaders() {
   if (typeof window === "undefined" || !ACCESS_TOKEN_KEY) return null;
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -64,6 +128,22 @@ export default function MyPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(
+    null,
+  );
+  const [extrasLoading, setExtrasLoading] = useState(false);
+  const [publicWorkbooks, setPublicWorkbooks] = useState<WorkbookBrief[]>([]);
+  const [crowdAccuracy, setCrowdAccuracy] = useState<
+    Record<string, WorkbookAccuracyRow>
+  >({});
+  const [reviewWorkbookId, setReviewWorkbookId] = useState<string | null>(null);
+  const [reviewData, setReviewData] = useState<WorkbookReviewResponse | null>(
+    null,
+  );
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewModalError, setReviewModalError] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -98,6 +178,152 @@ export default function MyPage() {
 
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    if (!API_BASE_URL || !profile) return;
+    const headers = getAuthHeaders();
+    if (!headers) return;
+    let cancelled = false;
+
+    void (async () => {
+      setExtrasLoading(true);
+      try {
+        const [statsRes, wbRes, accRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/auth/me/learning-stats`, { headers }),
+          fetch(`${API_BASE_URL}/public/workbooks`),
+          fetch(`${API_BASE_URL}/public/workbooks/accuracy`),
+        ]);
+        if (cancelled) return;
+
+        let statsParsed: LearningStats = {
+          overall: { totalCount: 0, correctCount: 0, accuracy: null },
+          workbooks: [],
+        };
+        if (statsRes.ok) {
+          statsParsed = (await statsRes.json()) as LearningStats;
+        }
+        setLearningStats(statsParsed);
+
+        let wbs: WorkbookBrief[] = [];
+        if (wbRes.ok) {
+          const arr = (await wbRes.json()) as Array<{
+            id: string;
+            title: string;
+            certificationType: string;
+          }>;
+          wbs = arr.map((w) => ({
+            id: w.id,
+            title: w.title,
+            certificationType: w.certificationType,
+          }));
+        }
+        setPublicWorkbooks(wbs);
+
+        const accMap: Record<string, WorkbookAccuracyRow> = {};
+        if (accRes.ok) {
+          const rows = (await accRes.json()) as WorkbookAccuracyRow[];
+          for (const r of Array.isArray(rows) ? rows : []) {
+            accMap[r.workbookId] = r;
+          }
+        }
+        setCrowdAccuracy(accMap);
+      } catch {
+        if (!cancelled) {
+          setLearningStats({
+            overall: { totalCount: 0, correctCount: 0, accuracy: null },
+            workbooks: [],
+          });
+          setPublicWorkbooks([]);
+          setCrowdAccuracy({});
+        }
+      } finally {
+        if (!cancelled) setExtrasLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
+
+  const solvedRows = useMemo(() => {
+    const ids = [...new Set(profile?.solvedWorkbookIds ?? [])];
+    const pubMap = new Map(publicWorkbooks.map((w) => [w.id, w]));
+    const mineMap = new Map(
+      (learningStats?.workbooks ?? []).map((w) => [w.workbookId, w]),
+    );
+    ids.sort((a, b) => {
+      const ta = pubMap.get(a)?.title ?? mineMap.get(a)?.title ?? a;
+      const tb = pubMap.get(b)?.title ?? mineMap.get(b)?.title ?? b;
+      return ta.localeCompare(tb, "ko");
+    });
+
+    return ids.map((id) => {
+      const pb = pubMap.get(id);
+      const mine = mineMap.get(id);
+      return {
+        id,
+        title: pb?.title ?? mine?.title ?? id,
+        certificationType: pb?.certificationType,
+        crowd: crowdAccuracy[id],
+        mine,
+      };
+    });
+  }, [profile?.solvedWorkbookIds, publicWorkbooks, crowdAccuracy, learningStats]);
+
+  const closeReviewModal = useCallback(() => {
+    setReviewWorkbookId(null);
+    setReviewData(null);
+    setReviewLoading(false);
+    setReviewModalError(null);
+  }, []);
+
+  const openReviewForWorkbook = useCallback(async (wid: string) => {
+    if (!API_BASE_URL) return;
+    const headers = getAuthHeaders();
+    if (!headers) return;
+    setReviewModalError(null);
+    setReviewWorkbookId(wid);
+    setReviewData(null);
+    setReviewLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/auth/me/workbooks/${encodeURIComponent(wid)}/review`,
+        { headers },
+      );
+      const raw = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          Array.isArray(raw?.message)
+            ? raw.message.join(", ")
+            : (raw?.message ?? `HTTP ${res.status}`),
+        );
+      }
+      const payload = raw as WorkbookReviewResponse;
+      if (!payload.sessions?.length) {
+        setReviewModalError(
+          "저장된 문항 채점 기록이 없습니다. 해당 문제집을 다시 한 번 제출하면 여기에서 확인할 수 있습니다.",
+        );
+      }
+      setReviewData(payload);
+    } catch (e) {
+      setReviewModalError(
+        e instanceof Error ? e.message : "채점 내역을 불러오지 못했습니다.",
+      );
+      setReviewData(null);
+    } finally {
+      setReviewLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!reviewWorkbookId) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeReviewModal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reviewWorkbookId, closeReviewModal]);
 
   const handleSaveCertification = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -179,7 +405,7 @@ export default function MyPage() {
             <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Account</p>
             <h1 className="mt-2 text-3xl font-semibold">마이페이지</h1>
             <p className="mt-2 text-sm text-neutral-400">
-              목표 자격증과 계정 정보를 관리합니다.
+              목표 자격증과 계정·학습 기록을 관리합니다.
             </p>
           </div>
           <Link href="/" className="text-sm text-sky-300 underline-offset-2 hover:underline">
@@ -209,6 +435,116 @@ export default function MyPage() {
               <p className="text-xs text-neutral-500">완료 문제집</p>
               <p className="mt-2 font-medium">{profile.solvedWorkbookIds?.length ?? 0}개</p>
             </div>
+          </section>
+        ) : null}
+
+        {profile && learningStats ? (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
+            <h2 className="text-lg font-semibold">나의 학습 현황</h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              유형별·문제집 연습 포함, 저장된 모든 선택 응답 기준 통합 정답률입니다.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-neutral-800 bg-black/40 px-4 py-3">
+                <p className="text-xs text-neutral-500">통합 정답률</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-300">
+                  {learningStats.overall.totalCount === 0
+                    ? "-"
+                    : learningStats.overall.accuracy !== null
+                      ? `${learningStats.overall.accuracy}%`
+                      : "-"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-neutral-800 bg-black/40 px-4 py-3">
+                <p className="text-xs text-neutral-500">누적 응답 수</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">
+                  {learningStats.overall.totalCount}
+                  <span className="text-sm font-normal text-neutral-500"> 문항</span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-neutral-800 bg-black/40 px-4 py-3">
+                <p className="text-xs text-neutral-500">누적 정답</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-sky-200">
+                  {learningStats.overall.correctCount}
+                  <span className="text-sm font-normal text-neutral-500">
+                    {" "}
+                    / {learningStats.overall.totalCount}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-neutral-500">
+              카테고리·추천 모드처럼 문제집이 아닌 풀이도 모두 포함됩니다. 같은 문항을
+              여러 번 풀면 그만큼 응답 수가 증가합니다.
+            </p>
+          </section>
+        ) : profile && extrasLoading ? (
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 text-sm text-neutral-400">
+            학습 통계를 불러오는 중입니다.
+          </div>
+        ) : null}
+
+        {profile ? (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
+            <h2 className="text-lg font-semibold">문제집 채점·오답 노트</h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              완료한 문제집별로 참여자 전체 평균 정답률·내 최초 제출 점수·재제출을
+              포함한 회차별 선택·정오답 내역을 볼 수 있습니다.
+            </p>
+            <p className="mt-2 text-[11px] text-neutral-500">
+              참여 통계 평균은 일반 회원 최초 제출만 포함합니다.
+            </p>
+            <ul className="mt-4 flex flex-col gap-3">
+              {solvedRows.length === 0 ? (
+                <li className="rounded-xl border border-dashed border-neutral-700 px-3 py-6 text-center text-sm text-neutral-500">
+                  아직 완료한 문제집이 없습니다. 홈에서 문제집을 풀고 제출하면 이곳에
+                  표시됩니다.
+                </li>
+              ) : (
+                solvedRows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-xl border border-neutral-800 bg-black/35 px-3 py-3"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {row.certificationType ? (
+                            <span className="rounded-full border border-neutral-700 bg-neutral-900 px-2 py-0.5 text-[10px] text-neutral-400">
+                              {row.certificationType}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-neutral-100">
+                          {row.title}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-neutral-500">
+                          <span>
+                            전체 평균{" "}
+                            {typeof row.crowd?.accuracy === "number"
+                              ? `${row.crowd.accuracy.toFixed(1)}% (${row.crowd.attemptCount}명 참여)`
+                              : "-"}
+                          </span>
+                          <span className="text-emerald-200/90">
+                            내 최초 제출{" "}
+                            {row.mine
+                              ? `${row.mine.accuracy.toFixed(1)}% (${row.mine.correctCount}/${row.mine.totalCount}) · 제출 ${row.mine.sessionCount}회`
+                              : "-"}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void openReviewForWorkbook(row.id)}
+                        className="shrink-0 rounded-lg border border-amber-500/70 bg-amber-950/40 px-3 py-2 text-xs font-semibold text-amber-100 transition hover:border-amber-400"
+                      >
+                        채점 결과 보기
+                      </button>
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
           </section>
         ) : null}
 
@@ -281,6 +617,135 @@ export default function MyPage() {
 
         {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+
+        {reviewWorkbookId ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-3 py-6">
+            <button
+              type="button"
+              aria-label="배경을 눌러 닫기"
+              className="absolute inset-0 cursor-default bg-transparent"
+              onClick={() => closeReviewModal()}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-700 bg-neutral-950 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-neutral-800 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-semibold text-neutral-100">
+                    채점 상세 · {reviewData?.title || reviewWorkbookId}
+                  </h3>
+                  <p className="text-[11px] text-neutral-500">
+                    제출 순서별로 선택한 보기·정답·문항 번호입니다. 최신 회차부터
+                    보입니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => closeReviewModal()}
+                  className="shrink-0 rounded-lg border border-neutral-600 px-2 py-1 text-xs text-neutral-300 hover:border-neutral-500"
+                >
+                  닫기
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {reviewLoading ? (
+                  <p className="text-sm text-neutral-400">불러오는 중…</p>
+                ) : (
+                  <>
+                    {reviewModalError ? (
+                      <p className="mb-3 rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
+                        {reviewModalError}
+                      </p>
+                    ) : null}
+                    {(reviewData?.sessions ?? []).map((sess, idx) => {
+                      const totalSessions = reviewData?.sessions?.length ?? 0;
+                      const n = totalSessions - idx;
+                      return (
+                        <details
+                          key={`${sess.submittedAt}-${idx}`}
+                          className="mb-3 rounded-xl border border-neutral-800 bg-neutral-900/50"
+                          open={idx === 0}
+                        >
+                          <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold text-neutral-200 hover:bg-neutral-900/80 [&::-webkit-details-marker]:hidden">
+                            <span className="tabular-nums">
+                              제출 #{n} ·{" "}
+                              {new Date(sess.submittedAt).toLocaleString("ko-KR")}{" "}
+                              · {sess.correctCount}/{sess.totalCount} 문항 정답 (
+                              {sess.accuracy}% )
+                            </span>
+                          </summary>
+                          <div className="border-t border-neutral-800 px-3 py-3">
+                            <ul className="flex flex-col gap-3">
+                              {sess.items
+                                .slice()
+                                .sort((a, b) => a.questionNumber - b.questionNumber)
+                                .map((item) => (
+                                  <li
+                                    key={`${sess.submittedAt}-${item.questionId}`}
+                                    className="rounded-lg border border-neutral-800/80 bg-black/40 p-3"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                                      <span className="tabular-nums text-neutral-500">
+                                        문항 #{item.questionNumber}
+                                      </span>
+                                      <span
+                                        className={
+                                          item.isCorrect
+                                            ? "font-semibold text-emerald-400"
+                                            : "font-semibold text-rose-400"
+                                        }
+                                      >
+                                        {item.isCorrect ? "정답" : "오답"}
+                                      </span>
+                                      <span className="text-neutral-600">
+                                        {item.questionCategory}
+                                      </span>
+                                      <span className="text-neutral-600">
+                                        · 난이도 {item.difficulty}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-100">
+                                      {item.questionDescription}
+                                    </p>
+                                    <dl className="mt-3 space-y-1.5 text-[11px]">
+                                      <div>
+                                        <dt className="text-neutral-500">
+                                          선택한 보기
+                                        </dt>
+                                        <dd className="text-neutral-200">
+                                          {formatChoiceLine(
+                                            item.choices,
+                                            item.selectedAnswer,
+                                          )}
+                                        </dd>
+                                      </div>
+                                      <div>
+                                        <dt className="text-neutral-500">
+                                          정답
+                                        </dt>
+                                        <dd className="font-medium text-emerald-300">
+                                          {formatChoiceLine(
+                                            item.choices,
+                                            item.correctAnswer,
+                                          )}
+                                        </dd>
+                                      </div>
+                                    </dl>
+                                  </li>
+                                ))}
+                            </ul>
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </main>
   );
