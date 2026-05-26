@@ -528,7 +528,7 @@ export default function MyPage() {
                           <span className="text-emerald-200/90">
                             내 최초 제출 정답률{" "}
                             {row.mine
-                              ? `${row.mine.accuracy.toFixed(1)}% (${row.mine.correctCount}/${row.mine.totalCount}) · 제출 ${row.mine.sessionCount}회`
+                              ? `${row.mine.accuracy.toFixed(1)}% (${row.mine.correctCount}/${row.mine.totalCount})`
                               : "-"}
                           </span>
                         </div>
