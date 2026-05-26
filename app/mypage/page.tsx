@@ -488,7 +488,7 @@ export default function MyPage() {
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
             <h2 className="text-lg font-semibold">문제집 채점·오답 노트</h2>
             <p className="mt-1 text-sm text-neutral-400">
-              완료한 문제집별로 참여자 전체 평균 정답률·내 최초 제출 점수·재제출을
+              완료한 문제집별로 참여자 전체 평균 정답률·내 최초 제출 정답률·재제출을
               포함한 회차별 선택·정오답 내역을 볼 수 있습니다.
             </p>
             <p className="mt-2 text-[11px] text-neutral-500">
@@ -520,13 +520,13 @@ export default function MyPage() {
                         </p>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-neutral-500">
                           <span>
-                            전체 평균{" "}
+                            전체 평균 정답률{" "}
                             {typeof row.crowd?.accuracy === "number"
                               ? `${row.crowd.accuracy.toFixed(1)}% (${row.crowd.attemptCount}명 참여)`
                               : "-"}
                           </span>
                           <span className="text-emerald-200/90">
-                            내 최초 제출{" "}
+                            내 최초 제출 정답률{" "}
                             {row.mine
                               ? `${row.mine.accuracy.toFixed(1)}% (${row.mine.correctCount}/${row.mine.totalCount}) · 제출 ${row.mine.sessionCount}회`
                               : "-"}
@@ -636,10 +636,6 @@ export default function MyPage() {
                   <h3 className="truncate text-base font-semibold text-neutral-100">
                     채점 상세 · {reviewData?.title || reviewWorkbookId}
                   </h3>
-                  <p className="text-[11px] text-neutral-500">
-                    제출 순서별로 선택한 보기·정답·문항 번호입니다. 최신 회차부터
-                    보입니다.
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -660,8 +656,7 @@ export default function MyPage() {
                       </p>
                     ) : null}
                     {(reviewData?.sessions ?? []).map((sess, idx) => {
-                      const totalSessions = reviewData?.sessions?.length ?? 0;
-                      const n = totalSessions - idx;
+                      const n = idx + 1;
                       return (
                         <details
                           key={`${sess.submittedAt}-${idx}`}

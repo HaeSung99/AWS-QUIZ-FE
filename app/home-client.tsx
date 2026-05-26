@@ -966,14 +966,14 @@ export default function HomeClient() {
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-500">
                                 <span className="text-sky-300/90">
-                                  전체 평균{" "}
+                                  전체 평균 정답률{" "}
                                   {typeof accuracy === "number"
                                     ? `${accuracy.toFixed(1)}%`
                                     : "-"}
                                   {isLoggedIn ? (
                                     <span className="text-neutral-400">
                                       {" "}
-                                      · 내 최초 제출{" "}
+                                      · 내 최초 제출 정답률{" "}
                                       {typeof personalWorkbookAccuracyMap[
                                         workbook.id
                                       ] === "number"
