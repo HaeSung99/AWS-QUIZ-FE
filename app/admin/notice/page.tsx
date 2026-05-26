@@ -234,7 +234,9 @@ export default function AdminNoticePage() {
                   {notice.pinned ? <span className="mr-1 text-amber-400">[고정]</span> : null}
                   {notice.title}
                 </p>
-                <p className="mt-1 text-neutral-400">{notice.body}</p>
+                <p className="mt-1 whitespace-pre-line break-words text-neutral-400">
+                  {notice.body}
+                </p>
                 <p className="mt-1 text-xs text-neutral-500">작성일: {formatDateTimeSeoul(notice.createdAt)}</p>
                 <div className="mt-3 flex gap-2">
                   <button

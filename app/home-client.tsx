@@ -839,7 +839,7 @@ export default function HomeClient() {
                           ) : null}
                           {item.title}
                         </p>
-                        <p className="mt-1 line-clamp-2 text-xs text-neutral-400">
+                        <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-xs text-neutral-400">
                           {item.body}
                         </p>
                       </li>

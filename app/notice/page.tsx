@@ -58,7 +58,7 @@ export default async function NoticePage() {
                   ) : null}
                   {item.title}
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-neutral-400">
                   {item.body}
                 </p>
               </li>
