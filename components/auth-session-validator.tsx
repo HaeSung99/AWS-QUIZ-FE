@@ -1,42 +1,38 @@
 "use client";
 
-import { clearClientAuthStorage } from "@/lib/auth-client";
+import { authApi } from "@/lib/api";
+import {
+  clearClientAuthStorage,
+  getAccessToken,
+  getRefreshToken,
+  refreshAuthSession,
+} from "@/lib/auth-client";
 import { useEffect } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
-
 /**
- * 앱 진입 시 저장된 JWT가 서버에서 유효한지 `/auth/me`로 확인하고,
- * 무효(401)이면 localStorage 인증 정보를 제거합니다.
+ * 앱 진입 시 access JWT 유효성 확인.
+ * 만료(401)이면 axios 인터셉터·refreshAuthSession으로 DB refresh 세션 검증 후 재발급,
+ * 실패 시 localStorage 인증 정보 제거.
  */
 export function AuthSessionValidator() {
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !API_BASE_URL ||
-      !ACCESS_TOKEN_KEY
-    ) {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!token) return;
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+    if (!access && !refresh) return;
 
     let cancelled = false;
 
     void (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
+        await authApi.me();
+      } catch {
+        const renewed = await refreshAuthSession();
         if (cancelled) return;
-        if (res.status === 401) {
+        if (!renewed) {
           clearClientAuthStorage();
         }
-      } catch {
-        // 네트워크 오류 등 — 클라이언트만으로 판단 불가하여 세션 유지
       }
     })();
 

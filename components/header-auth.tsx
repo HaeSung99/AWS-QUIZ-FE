@@ -2,14 +2,18 @@
 
 import {
   AUTH_STORAGE_CHANGED_EVENT,
-  notifyAuthStorageChanged,
+  clearClientAuthStorage,
+  getAccessToken,
+  getRefreshToken,
 } from "@/lib/auth-client";
+import { authApi } from "@/lib/api";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
+import { isApiConfigured } from "@/lib/api";
 type AuthSnapshot = { isLoggedIn: boolean; isAdmin: boolean };
 const LOGGED_OUT_SNAPSHOT: AuthSnapshot = { isLoggedIn: false, isAdmin: false };
 let cachedSnapshotKey = "";
@@ -21,6 +25,7 @@ function getClientSnapshot(): AuthSnapshot {
   }
 
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = getRefreshToken();
   const userRaw = localStorage.getItem(AUTH_USER_KEY);
   let isAdmin = false;
 
@@ -32,13 +37,13 @@ function getClientSnapshot(): AuthSnapshot {
     }
   }
 
-  const snapshotKey = `${token ?? ""}|${isAdmin ? "admin" : "user"}`;
+  const snapshotKey = `${token ?? ""}|${refreshToken ?? ""}|${isAdmin ? "admin" : "user"}`;
   if (snapshotKey === cachedSnapshotKey) {
     return cachedSnapshot;
   }
 
   cachedSnapshotKey = snapshotKey;
-  cachedSnapshot = { isLoggedIn: Boolean(token), isAdmin };
+  cachedSnapshot = { isLoggedIn: Boolean(token || refreshToken), isAdmin };
   return cachedSnapshot;
 }
 
@@ -69,11 +74,18 @@ export function HeaderAuth() {
     if (!ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
       return;
     }
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
-    notifyAuthStorageChanged();
-    router.push("/");
-    router.refresh();
+    void (async () => {
+      if (isApiConfigured() && (getAccessToken() || getRefreshToken())) {
+        try {
+          await authApi.logout();
+        } catch {
+          /* 로컬 세션은 항상 정리 */
+        }
+      }
+      clearClientAuthStorage();
+      router.push("/");
+      router.refresh();
+    })();
   };
 
   if (!isLoggedIn) {
