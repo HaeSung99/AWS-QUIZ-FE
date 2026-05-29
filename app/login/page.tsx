@@ -1,13 +1,10 @@
 "use client";
 
-import { notifyAuthStorageChanged } from "@/lib/auth-client";
+import { saveAuthSession } from "@/lib/auth-client";
+import { authApi, getApiErrorMessage, isAuthStorageConfigured } from "@/lib/api";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
-const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,31 +18,19 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    if (!isAuthStorageConfigured()) {
       setError("프론트 환경변수(.env) 설정을 확인해주세요.");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message ?? "로그인에 실패했습니다.");
-      }
-
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-      notifyAuthStorageChanged();
+      const data = await authApi.login({ email, password });
+      saveAuthSession(data);
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다.");
+      setError(getApiErrorMessage(err, "로그인 중 오류가 발생했습니다."));
     } finally {
       setLoading(false);
     }

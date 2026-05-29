@@ -9,25 +9,11 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_ORIGIN}/notice` },
 };
 
-type NoticeItem = { id: string; title: string; body: string; pinned?: boolean };
+import { fetchNoticesForServer } from "@/lib/api";
 
 export default async function NoticePage() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  let items: NoticeItem[] = [];
-
-  if (apiBaseUrl) {
-    try {
-      const res = await fetch(`${apiBaseUrl}/public/notices`, { cache: "no-store" });
-      if (res.ok) {
-        const data = (await res.json()) as unknown;
-        if (Array.isArray(data)) {
-          items = data as NoticeItem[];
-        }
-      }
-    } catch {
-      items = [];
-    }
-  }
+  const items = apiBaseUrl ? await fetchNoticesForServer(apiBaseUrl) : [];
 
   return (
     <main className="flex flex-1 flex-col bg-black px-4 py-8 text-neutral-100">

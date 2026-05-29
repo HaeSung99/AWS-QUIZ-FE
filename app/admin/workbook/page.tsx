@@ -1,6 +1,12 @@
 "use client";
 
-import axios from "axios";
+import { adminApi, getApiErrorMessage, isApiConfigured } from "@/lib/api";
+import type {
+  AdminQuestionItem,
+  CategoryRecommendation,
+  Workbook,
+  WorkbookAccuracy,
+} from "@/lib/api";
 import Link from "next/link";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
 import type { FormEvent } from "react";
@@ -12,44 +18,15 @@ type AuthUser = {
   name: string;
   role: "user" | "admin";
 };
-type Workbook = {
-  id: string;
-  certificationType: string;
-  title: string;
-  summary: string;
-  questionCount: number;
-  /** 생략 시 기존 데이터로 간주(게시완료로 표시) */
-  status?: "draft" | "published";
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
-type WorkbookAccuracy = {
-  workbookId: string;
-  title: string;
-  accuracy: number;
-  attemptCount: number;
-};
-type QuestionItem = {
-  id: string;
-  questionId: string;
-  questionNumber: number;
-  questionDescription: string;
-  choices: string[];
-  answer: string;
-  hint?: string;
-  difficulty: string;
-  questionCategory: string;
-};
-type CategoryRecommendationResponse = {
-  category: string;
-  score: number;
-  maxSimilarity: number;
-  averageSimilarity: number;
-  similarQuestionCount: number;
-  reason: string;
+type QuestionItem = AdminQuestionItem & { questionId?: string };
+
+type CategoryRecommendationResponse = CategoryRecommendation & {
+  maxSimilarity?: number;
+  averageSimilarity?: number;
+  similarQuestionCount?: number;
+  reason?: string;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
@@ -110,7 +87,7 @@ export default function AdminWorkbookPage() {
   const [confirmItemId, setConfirmItemId] = useState("");
 
   const auth = (() => {
-    if (!isHydrated || !API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    if (!isHydrated || !isApiConfigured() || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
       return { token: null as string | null, user: null as AuthUser | null };
     }
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -159,12 +136,9 @@ export default function AdminWorkbookPage() {
   };
 
   const loadItems = async (workbookId: string) => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     try {
-      const { data } = await axios.get<QuestionItem[]>(
-        `${API_BASE_URL}/admin/questions/${workbookId}/items`,
-        { headers: { Authorization: `Bearer ${auth.token}` } },
-      );
+      const data = await adminApi.getWorkbookItems(workbookId);
       const list = (Array.isArray(data) ? data : []).sort(
         (a, b) => a.questionNumber - b.questionNumber,
       );
@@ -191,30 +165,18 @@ export default function AdminWorkbookPage() {
   };
 
   const loadData = async () => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     try {
-      const [workbookRes, accuracyRes, categoryRes] = await Promise.all([
-        axios.get<Workbook[]>(`${API_BASE_URL}/admin/questions`, {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
-        axios.get<WorkbookAccuracy[]>(
-          `${API_BASE_URL}/public/workbooks/accuracy`,
-        ),
-        axios.get<string[]>(`${API_BASE_URL}/admin/question-categories`, {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
+      const [workbooks, accuracyRows, categories] = await Promise.all([
+        adminApi.getWorkbooks(),
+        adminApi.getWorkbookAccuracy(),
+        adminApi.getQuestionCategories(),
       ]);
-      setWorkbooks(Array.isArray(workbookRes.data) ? workbookRes.data : []);
-      setAccuracyRows(Array.isArray(accuracyRes.data) ? accuracyRes.data : []);
-      setUsedQuestionCategories(
-        Array.isArray(categoryRes.data) ? categoryRes.data : [],
-      );
+      setWorkbooks(Array.isArray(workbooks) ? workbooks : []);
+      setAccuracyRows(Array.isArray(accuracyRows) ? accuracyRows : []);
+      setUsedQuestionCategories(Array.isArray(categories) ? categories : []);
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "문제집 정보를 불러오지 못했습니다.";
+      const text = getApiErrorMessage(err, "문제집 정보를 불러오지 못했습니다.");
       setMessage(text || "문제집 정보를 불러오지 못했습니다.");
       setMessageTone("error");
       setWorkbooks([]);
@@ -224,7 +186,7 @@ export default function AdminWorkbookPage() {
   };
 
   useEffect(() => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     setMessage("");
     void (async () => {
       await loadData();
@@ -232,36 +194,34 @@ export default function AdminWorkbookPage() {
   }, [auth.token, authRole]);
 
   const saveWorkbook = async () => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     setMessage("");
     setMessageTone("info");
     setSaving(true);
     try {
       if (editingWorkbookId) {
-        await axios.patch(
-          `${API_BASE_URL}/admin/questions/${editingWorkbookId}`,
-          { certificationType, title, summary, questionCount },
-          { headers: { Authorization: `Bearer ${auth.token}` } },
-        );
+        await adminApi.updateWorkbook(editingWorkbookId, {
+          certificationType,
+          title,
+          summary,
+          questionCount,
+        });
         setMessage("문제집 수정 완료");
         setMessageTone("success");
       } else {
-        await axios.post(
-          `${API_BASE_URL}/admin/questions`,
-          { certificationType, title, summary, questionCount },
-          { headers: { Authorization: `Bearer ${auth.token}` } },
-        );
+        await adminApi.createWorkbook({
+          certificationType,
+          title,
+          summary,
+          questionCount,
+        });
         setMessage("문제집 생성 완료");
         setMessageTone("success");
       }
       resetWorkbookForm();
       await loadData();
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "문제집 생성 실패";
+      const text = getApiErrorMessage(err, "문제집 생성 실패");
       setMessage(text || "문제집 생성 실패");
       setMessageTone("error");
     } finally {
@@ -282,13 +242,11 @@ export default function AdminWorkbookPage() {
   };
 
   const onDeleteWorkbook = async (workbookId: string) => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     setMessage("");
     setMessageTone("info");
     try {
-      await axios.delete(`${API_BASE_URL}/admin/questions/${workbookId}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      });
+      await adminApi.deleteWorkbook(workbookId);
       if (selectedWorkbookId === workbookId) {
         setSelectedWorkbookId("");
         setItems([]);
@@ -300,11 +258,7 @@ export default function AdminWorkbookPage() {
       setMessageTone("success");
       await loadData();
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "문제집 삭제 실패";
+      const text = getApiErrorMessage(err, "문제집 삭제 실패");
       setMessage(text || "문제집 삭제 실패");
       setMessageTone("error");
     }
@@ -312,7 +266,7 @@ export default function AdminWorkbookPage() {
 
   const saveItem = async () => {
     if (
-      !API_BASE_URL ||
+      !isApiConfigured() ||
       !auth.token ||
       authRole !== "admin" ||
       !selectedWorkbookId
@@ -374,19 +328,11 @@ export default function AdminWorkbookPage() {
         questionCategory: trimmedQuestionCategory,
       };
       if (editingItemId) {
-        await axios.patch(
-          `${API_BASE_URL}/admin/questions/${selectedWorkbookId}/items/${editingItemId}`,
-          payload,
-          { headers: { Authorization: `Bearer ${auth.token}` } },
-        );
+        await adminApi.updateWorkbookItem(selectedWorkbookId, editingItemId, payload);
         setMessage("문제 수정 완료");
         setMessageTone("success");
       } else {
-        await axios.post(
-          `${API_BASE_URL}/admin/questions/${selectedWorkbookId}/items`,
-          payload,
-          { headers: { Authorization: `Bearer ${auth.token}` } },
-        );
+        await adminApi.createWorkbookItem(selectedWorkbookId, payload);
         setMessage("문제 생성 완료");
         setMessageTone("success");
       }
@@ -394,11 +340,7 @@ export default function AdminWorkbookPage() {
       await loadItems(selectedWorkbookId);
       await loadData();
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "문제 저장 실패";
+      const text = getApiErrorMessage(err, "문제 저장 실패");
       setMessage(text || "문제 저장 실패");
       setMessageTone("error");
     } finally {
@@ -407,7 +349,7 @@ export default function AdminWorkbookPage() {
   };
 
   const recommendQuestionCategory = async () => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     const trimmedQuestionDescription = questionDescription.trim();
     if (!trimmedQuestionDescription) return;
 
@@ -431,18 +373,14 @@ export default function AdminWorkbookPage() {
       const categoryCandidates = usedQuestionCategories.map((category) => ({
         value: category,
       }));
-      const { data } = await axios.post<CategoryRecommendationResponse[]>(
-        `${API_BASE_URL}/admin/question-categories/recommend`,
-        {
-          questionDescription: trimmedQuestionDescription,
-          choices,
-          answer: selectedAnswer,
-          hint,
-          difficulty,
-          categories: categoryCandidates,
-        },
-        { headers: { Authorization: `Bearer ${auth.token}` } },
-      );
+      const data = await adminApi.recommendQuestionCategory({
+        questionDescription: trimmedQuestionDescription,
+        choices,
+        answer: selectedAnswer,
+        hint,
+        difficulty,
+        categories: categoryCandidates,
+      });
       const recommendations = Array.isArray(data) ? data : [];
       setCategoryRecommendations(recommendations);
       if (recommendations.length > 0) {
@@ -452,11 +390,7 @@ export default function AdminWorkbookPage() {
         setMessageTone("error");
       }
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "카테고리 추천 실패";
+      const text = getApiErrorMessage(err, "카테고리 추천 실패");
       setMessage(text || "카테고리 추천 실패");
       setMessageTone("error");
     } finally {
@@ -481,7 +415,7 @@ export default function AdminWorkbookPage() {
 
   const onDeleteItem = async (itemId: string) => {
     if (
-      !API_BASE_URL ||
+      !isApiConfigured() ||
       !auth.token ||
       authRole !== "admin" ||
       !selectedWorkbookId
@@ -492,12 +426,7 @@ export default function AdminWorkbookPage() {
     try {
       const target = items.find((item) => item.id === itemId);
       const deletedNumber = target?.questionNumber ?? 0;
-      await axios.delete(
-        `${API_BASE_URL}/admin/questions/${selectedWorkbookId}/items/${itemId}`,
-        {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        },
-      );
+      await adminApi.deleteWorkbookItem(selectedWorkbookId, itemId);
       if (editingItemId === itemId) {
         resetItemForm();
       }
@@ -515,11 +444,7 @@ export default function AdminWorkbookPage() {
       setMessageTone("success");
       await loadItems(selectedWorkbookId);
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "문제 삭제 실패";
+      const text = getApiErrorMessage(err, "문제 삭제 실패");
       setMessage(text || "문제 삭제 실패");
       setMessageTone("error");
     }
@@ -577,15 +502,11 @@ export default function AdminWorkbookPage() {
     workbookId: string,
     status: "draft" | "published",
   ) => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     setMessage("");
     setMessageTone("info");
     try {
-      await axios.patch(
-        `${API_BASE_URL}/admin/questions/${workbookId}`,
-        { status },
-        { headers: { Authorization: `Bearer ${auth.token}` } },
-      );
+      await adminApi.updateWorkbook(workbookId, { status });
       setMessage(
         status === "published"
           ? "게시되었습니다."
@@ -594,11 +515,7 @@ export default function AdminWorkbookPage() {
       setMessageTone("success");
       await loadData();
     } catch (err) {
-      const text = axios.isAxiosError(err)
-        ? ((Array.isArray(err.response?.data?.message)
-            ? err.response?.data?.message.join(", ")
-            : err.response?.data?.message) ?? err.message)
-        : "상태를 변경하지 못했습니다.";
+      const text = getApiErrorMessage(err, "상태를 변경하지 못했습니다.");
       setMessage(text || "상태를 변경하지 못했습니다.");
       setMessageTone("error");
     }
@@ -642,7 +559,7 @@ export default function AdminWorkbookPage() {
     );
   }
 
-  if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+  if (!isApiConfigured() || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
     return (
       <main className="flex flex-1 items-center justify-center text-neutral-300">
         환경변수 설정을 확인해주세요.
@@ -1028,8 +945,8 @@ export default function AdminWorkbookPage() {
                                 문제 {item.similarQuestionCount}개
                               </span>
                               <span className="mt-1 block text-[11px] text-neutral-500">
-                                최고 {(item.maxSimilarity * 100).toFixed(1)}% /
-                                평균 {(item.averageSimilarity * 100).toFixed(1)}
+                                최고 {((item.maxSimilarity ?? 0) * 100).toFixed(1)}% /
+                                평균 {((item.averageSimilarity ?? 0) * 100).toFixed(1)}
                                 %
                               </span>
                             </button>

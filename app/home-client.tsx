@@ -1,6 +1,18 @@
 "use client";
 
-import axios from "axios";
+import {
+  authApi,
+  isApiConfigured,
+  isUnauthorizedError,
+  publicApi,
+  userApi,
+  type Notice,
+  type WeakCategory,
+  type WeaknessComment,
+  type Workbook,
+  type WorkbookAccuracy,
+  type AuthUser,
+} from "@/lib/api";
 import Link from "next/link";
 import {
   AUTH_STORAGE_CHANGED_EVENT,
@@ -14,7 +26,6 @@ import {
 } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const NOTICE_HOME_MAX = 4;
@@ -42,46 +53,14 @@ const SITE_CERT_GUIDE = {
   },
 };
 
-type NoticeItem = { id: string; title: string; body: string; pinned?: boolean };
-type WorkbookItem = {
-  id: string;
-  certificationType: string;
-  title: string;
-  summary: string;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
-type WorkbookAccuracyItem = {
-  workbookId: string;
-  title: string;
-  accuracy: number;
-  attemptCount: number;
-};
-type WeakCategoryItem = {
-  category: string;
-  totalCount: number;
-  correctCount: number;
-  wrongCount: number;
-  wrongRate: number;
-};
-type WeaknessComment = {
-  comment: string;
-  attemptCount: number;
-  requiredAttemptCount: number;
-  remainingAttemptCount: number;
-  ready: boolean;
-};
-type StoredUser = {
-  id: number;
-  email: string;
-  name: string;
-  role: "user" | "admin";
-  targetCertificationType?: string | null;
-  solvedWorkbookIds?: string[];
-};
+type NoticeItem = Notice;
+type WorkbookItem = Workbook;
+type WorkbookAccuracyItem = WorkbookAccuracy;
+type WeakCategoryItem = WeakCategory;
+type StoredUser = AuthUser;
 
 function clearAuthIfUnauthorized(err: unknown) {
-  if (axios.isAxiosError(err) && err.response?.status === 401) {
+  if (isUnauthorizedError(err)) {
     clearClientAuthStorage();
   }
 }
@@ -154,7 +133,7 @@ export default function HomeClient() {
 
   const fetchPersonalWorkbookAccuracy = useCallback(() => {
     if (
-      !API_BASE_URL ||
+      !isApiConfigured() ||
       !ACCESS_TOKEN_KEY ||
       typeof window === "undefined"
     ) {
@@ -167,11 +146,7 @@ export default function HomeClient() {
     }
     void (async () => {
       try {
-        const { data } = await axios.get<{
-          workbooks: { workbookId: string; accuracy: number }[];
-        }>(`${API_BASE_URL}/auth/me/learning-stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const data = await userApi.getLearningStats();
         const m: Record<string, number> = {};
         for (const row of Array.isArray(data.workbooks) ? data.workbooks : []) {
           m[row.workbookId] = row.accuracy;
@@ -211,15 +186,14 @@ export default function HomeClient() {
 
   const trackVisitEvent = useCallback(
     (eventType: string) => {
-      if (!API_BASE_URL || typeof window === "undefined") return;
+      if (!isApiConfigured() || typeof window === "undefined") return;
       if (sentVisitEventsRef.current.has(eventType)) return;
       sentVisitEventsRef.current.add(eventType);
       const clientKey = getClientKey();
       const isLoggedInNow = ACCESS_TOKEN_KEY
         ? Boolean(localStorage.getItem(ACCESS_TOKEN_KEY))
         : false;
-      void axios
-        .post(`${API_BASE_URL}/public/track-visit`, {
+      void publicApi.trackVisit({
           clientKey,
           eventType,
           isLoggedIn: isLoggedInNow,
@@ -230,12 +204,10 @@ export default function HomeClient() {
   );
 
   useEffect(() => {
-    if (!API_BASE_URL) return;
+    if (!isApiConfigured()) return;
     void (async () => {
       try {
-        const { data } = await axios.get<NoticeItem[]>(
-          `${API_BASE_URL}/public/notices`,
-        );
+        const data = await publicApi.getNotices();
         setNoticeItems(Array.isArray(data) ? data : []);
       } catch {
         setNoticeItems([]);
@@ -244,7 +216,7 @@ export default function HomeClient() {
   }, []);
 
   useEffect(() => {
-    if (!API_BASE_URL || !ACCESS_TOKEN_KEY || typeof window === "undefined")
+    if (!isApiConfigured() || !ACCESS_TOKEN_KEY || typeof window === "undefined")
       return;
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!token) return;
@@ -253,21 +225,11 @@ export default function HomeClient() {
       setWeakCategoriesLoading(true);
       try {
         const [personal, global] = await Promise.all([
-          axios.get<WeakCategoryItem[]>(
-            `${API_BASE_URL}/auth/me/weak-categories`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          ),
-          axios.get<WeakCategoryItem[]>(
-            `${API_BASE_URL}/auth/weak-categories/global`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          ),
+          userApi.getWeakCategories(),
+          userApi.getGlobalWeakCategories(),
         ]);
-        setMyWeakCategories(Array.isArray(personal.data) ? personal.data : []);
-        setGlobalWeakCategories(Array.isArray(global.data) ? global.data : []);
+        setMyWeakCategories(Array.isArray(personal) ? personal : []);
+        setGlobalWeakCategories(Array.isArray(global) ? global : []);
       } catch (err) {
         clearAuthIfUnauthorized(err);
         setMyWeakCategories([]);
@@ -280,12 +242,7 @@ export default function HomeClient() {
     void (async () => {
       setWeaknessCommentLoading(true);
       try {
-        const { data } = await axios.get<WeaknessComment>(
-          `${API_BASE_URL}/auth/me/weakness-comment`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
+        const data = await userApi.getWeaknessComment();
         setWeaknessComment(data.comment);
         setWeaknessProgress({
           attemptCount: data.attemptCount,
@@ -304,12 +261,10 @@ export default function HomeClient() {
   }, []);
 
   useEffect(() => {
-    if (!API_BASE_URL) return;
+    if (!isApiConfigured()) return;
     void (async () => {
       try {
-        const { data } = await axios.get<WorkbookItem[]>(
-          `${API_BASE_URL}/public/workbooks`,
-        );
+        const data = await publicApi.getWorkbooks();
         setWorkbookItems(Array.isArray(data) ? data : []);
       } catch {
         setWorkbookItems([]);
@@ -318,12 +273,10 @@ export default function HomeClient() {
   }, []);
 
   useEffect(() => {
-    if (!API_BASE_URL) return;
+    if (!isApiConfigured()) return;
     void (async () => {
       try {
-        const { data } = await axios.get<WorkbookAccuracyItem[]>(
-          `${API_BASE_URL}/public/workbooks/accuracy`,
-        );
+        const data = await publicApi.getWorkbookAccuracy();
         if (!Array.isArray(data)) {
           setWorkbookAccuracyMap({});
           return;
@@ -360,7 +313,7 @@ export default function HomeClient() {
 
   useEffect(() => {
     if (
-      !API_BASE_URL ||
+      !isApiConfigured() ||
       !ACCESS_TOKEN_KEY ||
       !AUTH_USER_KEY ||
       typeof window === "undefined"
@@ -385,23 +338,18 @@ export default function HomeClient() {
       }
 
       try {
-        const { data } = await axios.get<{ user: StoredUser }>(
-          `${API_BASE_URL}/auth/me`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        const solved = Array.isArray(data.user?.solvedWorkbookIds)
-          ? data.user.solvedWorkbookIds
+        const { user } = await authApi.me();
+        const solved = Array.isArray(user?.solvedWorkbookIds)
+          ? user.solvedWorkbookIds
           : [];
         setSolvedWorkbookIds(solved);
-        setTargetCertificationType(data.user?.targetCertificationType ?? null);
+        setTargetCertificationType(user?.targetCertificationType ?? null);
         setIsLoggedIn(true);
 
-        if (data.user) {
+        if (user) {
           localStorage.setItem(
             AUTH_USER_KEY,
-            JSON.stringify({ ...data.user, solvedWorkbookIds: solved }),
+            JSON.stringify({ ...user, solvedWorkbookIds: solved }),
           );
         }
       } catch (err) {

@@ -1,21 +1,14 @@
 "use client";
 
-import axios from "axios";
+import { adminApi, getApiErrorMessage, isApiConfigured } from "@/lib/api";
 import Link from "next/link";
 import { formatDateTimeSeoul } from "@/lib/date-kst";
+import type { Notice } from "@/lib/api";
 import type { FormEvent } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 type AuthUser = { id: number; email: string; name: string; role: "user" | "admin" };
-type Notice = {
-  id: string;
-  title: string;
-  body: string;
-  pinned: boolean;
-  createdAt?: string | null;
-};
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const subscribeNoop = () => () => {};
@@ -48,10 +41,7 @@ export default function AdminNoticePage() {
   const loadNotices = async () => {
     if (!token) return;
     try {
-      const { data } = await axios.get<Notice[]>(`${API_BASE_URL}/admin/notices`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setNotices(data);
+      setNotices(await adminApi.getNotices());
     } catch {
       setNotices([]);
     }
@@ -59,35 +49,19 @@ export default function AdminNoticePage() {
 
   useEffect(() => {
     if (!token) return;
-    void (async () => {
-      try {
-        const { data } = await axios.get<Notice[]>(`${API_BASE_URL}/admin/notices`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setNotices(data);
-      } catch {
-        setNotices([]);
-      }
-    })();
+    void loadNotices();
   }, [token]);
 
   const onCreateNotice = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!token) return;
     setNoticeMessage("");
+    const body = { title: noticeTitle, body: noticeBody, pinned: noticePinned };
     try {
       if (editingNoticeId) {
-        await axios.patch(
-          `${API_BASE_URL}/admin/notices/${editingNoticeId}`,
-          { title: noticeTitle, body: noticeBody, pinned: noticePinned },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        await adminApi.updateNotice(editingNoticeId, body);
       } else {
-        await axios.post(
-          `${API_BASE_URL}/admin/notices`,
-          { title: noticeTitle, body: noticeBody, pinned: noticePinned },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        await adminApi.createNotice(body);
       }
       setNoticeTitle("");
       setNoticeBody("");
@@ -96,14 +70,7 @@ export default function AdminNoticePage() {
       setNoticeMessage(editingNoticeId ? "공지 수정 완료" : "공지 저장 완료");
       await loadNotices();
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const message = Array.isArray(err.response?.data?.message)
-          ? err.response?.data?.message.join(", ")
-          : err.response?.data?.message ?? err.message;
-        setNoticeMessage(message || "공지 저장 실패");
-        return;
-      }
-      setNoticeMessage("공지 저장 실패");
+      setNoticeMessage(getApiErrorMessage(err, "공지 저장 실패"));
     }
   };
 
@@ -111,9 +78,7 @@ export default function AdminNoticePage() {
     if (!token) return;
     setNoticeMessage("");
     try {
-      await axios.delete(`${API_BASE_URL}/admin/notices/${noticeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await adminApi.deleteNotice(noticeId);
       if (editingNoticeId === noticeId) {
         setEditingNoticeId("");
         setNoticeTitle("");
@@ -123,14 +88,7 @@ export default function AdminNoticePage() {
       await loadNotices();
       setNoticeMessage("공지 삭제 완료");
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const message = Array.isArray(err.response?.data?.message)
-          ? err.response?.data?.message.join(", ")
-          : err.response?.data?.message ?? err.message;
-        setNoticeMessage(message || "공지 삭제 실패");
-        return;
-      }
-      setNoticeMessage("공지 삭제 실패");
+      setNoticeMessage(getApiErrorMessage(err, "공지 삭제 실패"));
     }
   };
 
@@ -138,7 +96,7 @@ export default function AdminNoticePage() {
     return <main className="flex flex-1 items-center justify-center text-neutral-300">확인 중...</main>;
   }
 
-  if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+  if (!isApiConfigured() || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
     return (
       <main className="flex flex-1 items-center justify-center text-neutral-300">
         환경변수 설정을 확인해주세요.
@@ -245,7 +203,7 @@ export default function AdminNoticePage() {
                       setEditingNoticeId(notice.id);
                       setNoticeTitle(notice.title);
                       setNoticeBody(notice.body);
-                      setNoticePinned(notice.pinned);
+                      setNoticePinned(notice.pinned ?? false);
                     }}
                     className="rounded-md border border-neutral-500 px-2 py-1 text-xs"
                   >

@@ -1,11 +1,20 @@
 "use client";
 
+import {
+  authApi,
+  isApiConfigured,
+  publicApi,
+  userApi,
+  getApiErrorMessage,
+  type LearningStats,
+  type UserProfile,
+  type WorkbookBrief,
+  type WorkbookReview,
+  type WorkbookAccuracy as WorkbookAccuracyRow,
+} from "@/lib/api";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
-const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
+import { AUTH_USER_KEY, getAccessToken, getRefreshToken, notifyAuthStorageChanged } from "@/lib/auth-client";
 const TARGET_CERT_NONE = "";
 const AWS_CERTIFICATION_OPTIONS = [
   "SAA-C03",
@@ -35,69 +44,6 @@ const AWS_CERTIFICATION_LABELS: Record<string, string> = {
   "AIF-C01": "AIF-C01 - AI Practitioner",
 };
 
-type UserProfile = {
-  id: number;
-  email: string;
-  name: string;
-  role: string;
-  targetCertificationType?: string | null;
-  solvedWorkbookIds?: string[];
-};
-
-type LearningStats = {
-  overall: {
-    totalCount: number;
-    correctCount: number;
-    accuracy: number | null;
-  };
-  workbooks: Array<{
-    workbookId: string;
-    title: string;
-    accuracy: number;
-    sessionCount: number;
-    correctCount: number;
-    totalCount: number;
-  }>;
-};
-
-type WorkbookBrief = {
-  id: string;
-  title: string;
-  certificationType?: string;
-};
-
-type WorkbookAccuracyRow = {
-  workbookId: string;
-  accuracy: number;
-  attemptCount: number;
-};
-
-type ReviewItem = {
-  questionId: string;
-  questionNumber: number;
-  questionDescription: string;
-  choices: string[];
-  difficulty: string;
-  questionCategory: string;
-  selectedAnswer: string | null;
-  correctAnswer: string;
-  isCorrect: boolean;
-};
-
-type ReviewSession = {
-  submittedAt: string;
-  accuracy: number;
-  correctCount: number;
-  totalCount: number;
-  items: ReviewItem[];
-};
-
-type WorkbookReviewResponse = {
-  workbookId: string;
-  title: string;
-  sessions: ReviewSession[];
-};
-
 function formatChoiceLine(
   choices: string[],
   answer: string | null | undefined,
@@ -106,16 +52,6 @@ function formatChoiceLine(
   const idx = choices.findIndex((c) => c === answer);
   if (idx < 0) return answer;
   return `${idx + 1}. ${answer}`;
-}
-
-function getAuthHeaders() {
-  if (typeof window === "undefined" || !ACCESS_TOKEN_KEY) return null;
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  if (!token) return null;
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
 }
 
 export default function MyPage() {
@@ -137,7 +73,7 @@ export default function MyPage() {
     Record<string, WorkbookAccuracyRow>
   >({});
   const [reviewWorkbookId, setReviewWorkbookId] = useState<string | null>(null);
-  const [reviewData, setReviewData] = useState<WorkbookReviewResponse | null>(
+  const [reviewData, setReviewData] = useState<WorkbookReview | null>(
     null,
   );
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -150,27 +86,21 @@ export default function MyPage() {
       setLoading(true);
       setError("");
 
-      const headers = getAuthHeaders();
-      if (!API_BASE_URL || !headers) {
+      if (!isApiConfigured() || (!getAccessToken() && !getRefreshToken())) {
         setError("로그인이 필요합니다.");
         setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/me`, { headers });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.message ?? "프로필을 불러오지 못했습니다.");
-        }
-        const user = data.user as UserProfile;
+        const { user } = await authApi.me();
         setProfile(user);
         setTargetCertificationType(user.targetCertificationType ?? TARGET_CERT_NONE);
         if (AUTH_USER_KEY) {
           localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "프로필 조회 중 오류가 발생했습니다.");
+        setError(getApiErrorMessage(err, "프로필 조회 중 오류가 발생했습니다."));
       } finally {
         setLoading(false);
       }
@@ -180,51 +110,32 @@ export default function MyPage() {
   }, []);
 
   useEffect(() => {
-    if (!API_BASE_URL || !profile) return;
-    const headers = getAuthHeaders();
-    if (!headers) return;
+    if (!isApiConfigured() || !profile) return;
     let cancelled = false;
 
     void (async () => {
       setExtrasLoading(true);
       try {
         const [statsRes, wbRes, accRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/auth/me/learning-stats`, { headers }),
-          fetch(`${API_BASE_URL}/public/workbooks`),
-          fetch(`${API_BASE_URL}/public/workbooks/accuracy`),
+          userApi.getLearningStats(),
+          publicApi.getWorkbooks(),
+          publicApi.getWorkbookAccuracy(),
         ]);
         if (cancelled) return;
-
-        let statsParsed: LearningStats = {
-          overall: { totalCount: 0, correctCount: 0, accuracy: null },
-          workbooks: [],
-        };
-        if (statsRes.ok) {
-          statsParsed = (await statsRes.json()) as LearningStats;
-        }
-        setLearningStats(statsParsed);
-
-        let wbs: WorkbookBrief[] = [];
-        if (wbRes.ok) {
-          const arr = (await wbRes.json()) as Array<{
-            id: string;
-            title: string;
-            certificationType: string;
-          }>;
-          wbs = arr.map((w) => ({
-            id: w.id,
-            title: w.title,
-            certificationType: w.certificationType,
-          }));
-        }
-        setPublicWorkbooks(wbs);
+        setLearningStats(statsRes);
+        setPublicWorkbooks(
+          Array.isArray(wbRes)
+            ? wbRes.map((w) => ({
+                id: w.id,
+                title: w.title,
+                certificationType: w.certificationType,
+              }))
+            : [],
+        );
 
         const accMap: Record<string, WorkbookAccuracyRow> = {};
-        if (accRes.ok) {
-          const rows = (await accRes.json()) as WorkbookAccuracyRow[];
-          for (const r of Array.isArray(rows) ? rows : []) {
-            accMap[r.workbookId] = r;
-          }
+        for (const r of Array.isArray(accRes) ? accRes : []) {
+          accMap[r.workbookId] = r;
         }
         setCrowdAccuracy(accMap);
       } catch {
@@ -279,27 +190,13 @@ export default function MyPage() {
   }, []);
 
   const openReviewForWorkbook = useCallback(async (wid: string) => {
-    if (!API_BASE_URL) return;
-    const headers = getAuthHeaders();
-    if (!headers) return;
+    if (!isApiConfigured()) return;
     setReviewModalError(null);
     setReviewWorkbookId(wid);
     setReviewData(null);
     setReviewLoading(true);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/auth/me/workbooks/${encodeURIComponent(wid)}/review`,
-        { headers },
-      );
-      const raw = await res.json();
-      if (!res.ok) {
-        throw new Error(
-          Array.isArray(raw?.message)
-            ? raw.message.join(", ")
-            : (raw?.message ?? `HTTP ${res.status}`),
-        );
-      }
-      const payload = raw as WorkbookReviewResponse;
+      const payload = await userApi.getWorkbookReview(wid);
       if (!payload.sessions?.length) {
         setReviewModalError(
           "저장된 문항 채점 기록이 없습니다. 해당 문제집을 다시 한 번 제출하면 여기에서 확인할 수 있습니다.",
@@ -307,9 +204,7 @@ export default function MyPage() {
       }
       setReviewData(payload);
     } catch (e) {
-      setReviewModalError(
-        e instanceof Error ? e.message : "채점 내역을 불러오지 못했습니다.",
-      );
+      setReviewModalError(getApiErrorMessage(e, "채점 내역을 불러오지 못했습니다."));
       setReviewData(null);
     } finally {
       setReviewLoading(false);
@@ -330,35 +225,26 @@ export default function MyPage() {
     setMessage("");
     setError("");
 
-    const headers = getAuthHeaders();
-    if (!API_BASE_URL || !headers) {
+    if (!isApiConfigured()) {
       setError("로그인이 필요합니다.");
       return;
     }
 
     setCertSaving(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me/target-certification`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({
-          targetCertificationType: targetCertificationType || null,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message ?? "목표 자격증 저장에 실패했습니다.");
-      }
+      const { user } = await authApi.updateTargetCertification(
+        targetCertificationType || null,
+      );
 
-      setProfile(data.user);
-      setTargetCertificationType(data.user.targetCertificationType ?? TARGET_CERT_NONE);
+      setProfile(user);
+      setTargetCertificationType(user.targetCertificationType ?? TARGET_CERT_NONE);
       if (AUTH_USER_KEY) {
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-        window.dispatchEvent(new StorageEvent("storage", { key: AUTH_USER_KEY }));
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        notifyAuthStorageChanged();
       }
       setMessage("목표 자격증을 저장했습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "목표 자격증 저장 중 오류가 발생했습니다.");
+      setError(getApiErrorMessage(err, "목표 자격증 저장 중 오류가 발생했습니다."));
     } finally {
       setCertSaving(false);
     }
@@ -369,29 +255,20 @@ export default function MyPage() {
     setMessage("");
     setError("");
 
-    const headers = getAuthHeaders();
-    if (!API_BASE_URL || !headers) {
+    if (!isApiConfigured()) {
       setError("로그인이 필요합니다.");
       return;
     }
 
     setPasswordSaving(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me/password`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message ?? "비밀번호 변경에 실패했습니다.");
-      }
+      await authApi.changePassword(currentPassword, newPassword);
 
       setCurrentPassword("");
       setNewPassword("");
       setMessage("비밀번호를 변경했습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "비밀번호 변경 중 오류가 발생했습니다.");
+      setError(getApiErrorMessage(err, "비밀번호 변경 중 오류가 발생했습니다."));
     } finally {
       setPasswordSaving(false);
     }

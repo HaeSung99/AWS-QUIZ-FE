@@ -1,6 +1,14 @@
 "use client";
 
-import axios from "axios";
+import { AUTH_STORAGE_CHANGED_EVENT, getAccessToken, getRefreshToken } from "@/lib/auth-client";
+import {
+  getApiErrorMessage,
+  isApiConfigured,
+  isUnauthorizedError,
+  publicApi,
+  userApi,
+  type QuizQuestion,
+} from "@/lib/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -11,23 +19,8 @@ import {
   useSyncExternalStore,
 } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
 const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 
-type QuizQuestion = {
-  id: string;
-  questionNumber: number;
-  questionDescription: string;
-  choices: string[];
-  answer: string;
-  hint?: string;
-  difficulty: string;
-  questionCategory: string;
-  certificationType?: string | null;
-  similarity?: number;
-  recommendReason?: string;
-};
 type QuizResultItem = {
   questionId: string;
   questionNumber: number;
@@ -65,12 +58,15 @@ function choiceIndexAndText(
 function subscribeAuthToken(onStoreChange: () => void) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
+  window.addEventListener(AUTH_STORAGE_CHANGED_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(AUTH_STORAGE_CHANGED_EVENT, onStoreChange);
+  };
 }
 
 function getAuthTokenSnapshot() {
-  if (typeof window === "undefined" || !ACCESS_TOKEN_KEY) return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return getAccessToken() ?? getRefreshToken();
 }
 
 function QuizPageContent() {
@@ -101,7 +97,7 @@ function QuizPageContent() {
   const isCategoryMode = !workbookId && Boolean(category);
 
   useEffect(() => {
-    if (!API_BASE_URL || !token) return;
+    if (!isApiConfigured() || !token) return;
     if (!workbookId && !category && !isRecommendedMode && !isDailyMode) return;
     void (async () => {
       setMessage("");
@@ -112,29 +108,16 @@ function QuizPageContent() {
       setSubmitted(false);
       setCurrentIndex(0);
       try {
-        const url = isDailyMode
-          ? `${API_BASE_URL}/auth/me/daily-questions?limit=5`
+        const data = isDailyMode
+          ? await userApi.getDailyQuestions(5)
           : isRecommendedMode
-            ? `${API_BASE_URL}/auth/me/recommended-questions?limit=20`
+            ? await userApi.getRecommendedQuestions(20)
             : workbookId
-              ? `${API_BASE_URL}/public/workbooks/${workbookId}/items`
-              : `${API_BASE_URL}/public/questions/by-category?category=${encodeURIComponent(category)}&limit=20`;
-        const { data } = await axios.get<QuizQuestion[]>(
-          url,
-          isRecommendedMode || isDailyMode
-            ? { headers: { Authorization: `Bearer ${token}` } }
-            : undefined,
-        );
+              ? await publicApi.getWorkbookItems(workbookId)
+              : await publicApi.getQuestionsByCategory(category, 20);
         setQuestions(Array.isArray(data) ? data : []);
       } catch (e) {
-        if (axios.isAxiosError(e)) {
-          const errMsg = Array.isArray(e.response?.data?.message)
-            ? e.response?.data?.message.join(", ")
-            : (e.response?.data?.message ?? e.message);
-          setMessage(errMsg || "문제 조회 실패");
-          return;
-        }
-        setMessage("문제 조회 실패");
+        setMessage(getApiErrorMessage(e, "문제 조회 실패"));
       }
     })();
   }, [token, workbookId, category, isRecommendedMode, isDailyMode]);
@@ -182,7 +165,8 @@ function QuizPageContent() {
   }, [submitConfirmOpen, isSubmitting]);
 
   const onSubmit = async () => {
-    if (!API_BASE_URL || !token || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) return;
+    if (!isApiConfigured() || !AUTH_USER_KEY) return;
+    if (!getAccessToken() && !getRefreshToken()) return;
     const total = questions.length;
     if (total === 0) return;
 
@@ -208,28 +192,30 @@ function QuizPageContent() {
       setSubmitted(true);
 
       try {
-        await axios.post(
-          `${API_BASE_URL}/auth/me/workbook-attempts`,
-          {
-            workbookId: workbookId || undefined,
-            correctCount: score,
-            totalCount: total,
-            questionAttempts: items.map((item) => {
-              const q = questionById.get(item.questionId);
-              return {
-                questionId: item.questionId,
-                questionCategory: q?.questionCategory ?? "미분류",
-                difficulty: q?.difficulty ?? "미지정",
-                certificationType: q?.certificationType ?? null,
-                selectedAnswer: item.selectedAnswer,
-                correctAnswer: item.correctAnswer,
-                isCorrect: item.isCorrect,
-              };
-            }),
-          },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-      } catch {}
+        await userApi.recordWorkbookAttempt({
+          workbookId: workbookId || undefined,
+          correctCount: score,
+          totalCount: total,
+          questionAttempts: items.map((item) => {
+            const q = questionById.get(item.questionId);
+            return {
+              questionId: item.questionId,
+              questionCategory: q?.questionCategory ?? "미분류",
+              difficulty: q?.difficulty ?? "미지정",
+              certificationType: q?.certificationType ?? null,
+              selectedAnswer: item.selectedAnswer,
+              correctAnswer: item.correctAnswer,
+              isCorrect: item.isCorrect,
+            };
+          }),
+        });
+      } catch (submitErr) {
+        if (isUnauthorizedError(submitErr)) {
+          setMessage(
+            "세션이 만료되어 서버에 저장하지 못했습니다. 다시 로그인 후 제출해주세요.",
+          );
+        }
+      }
 
       if (!workbookId) {
         setMessage("채점 완료 및 약점 유형 통계 저장");
@@ -237,11 +223,7 @@ function QuizPageContent() {
       }
 
       try {
-        const { data } = await axios.post<{ solvedWorkbookIds: string[] }>(
-          `${API_BASE_URL}/auth/me/solved-workbooks/${workbookId}`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+        const data = await userApi.markWorkbookSolved(workbookId);
         const rawUser = localStorage.getItem(AUTH_USER_KEY);
         if (rawUser) {
           const user = JSON.parse(rawUser) as {

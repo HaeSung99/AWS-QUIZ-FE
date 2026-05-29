@@ -1,6 +1,6 @@
 "use client";
 
-import axios from "axios";
+import { adminApi, getApiErrorMessage, isApiConfigured } from "@/lib/api";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -276,7 +276,7 @@ export default function AdminDashboardPage() {
   const [statsError, setStatsError] = useState("");
 
   const auth = (() => {
-    if (!isHydrated || !API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    if (!isHydrated || !isApiConfigured() || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
       return { token: null as string | null, user: null as AuthUser | null };
     }
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -291,22 +291,15 @@ export default function AdminDashboardPage() {
   const authRole = auth.user?.role ?? null;
 
   useEffect(() => {
-    if (!API_BASE_URL || !auth.token || authRole !== "admin") return;
+    if (!isApiConfigured() || !auth.token || authRole !== "admin") return;
     setLoadingStats(true);
     setStatsError("");
     void (async () => {
       try {
-        const { data } = await axios.get<AdminOverview>(`${API_BASE_URL}/admin/stats/overview`, {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        });
+        const data = await adminApi.getOverview();
         setOverview(data);
       } catch (err) {
-        const message = axios.isAxiosError(err)
-          ? (Array.isArray(err.response?.data?.message)
-              ? err.response?.data?.message.join(", ")
-              : err.response?.data?.message) ?? err.message
-          : "통계를 불러오지 못했습니다.";
-        setStatsError(message || "통계를 불러오지 못했습니다.");
+        setStatsError(getApiErrorMessage(err, "통계를 불러오지 못했습니다."));
         setOverview(null);
       } finally {
         setLoadingStats(false);
@@ -318,7 +311,7 @@ export default function AdminDashboardPage() {
     return <main className="flex flex-1 items-center justify-center text-neutral-300">확인 중...</main>;
   }
 
-  if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+  if (!isApiConfigured() || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
     return (
       <main className="flex flex-1 items-center justify-center text-neutral-300">
         환경변수 설정을 확인해주세요.

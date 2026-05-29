@@ -1,15 +1,18 @@
 "use client";
 
-import { notifyAuthStorageChanged } from "@/lib/auth-client";
+import { saveAuthSession } from "@/lib/auth-client";
+import {
+  authApi,
+  getApiErrorMessage,
+  isApiConfigured,
+  isAuthStorageConfigured,
+} from "@/lib/api";
+import { isAxiosError } from "axios";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-/** 백엔드 `EMAIL_RESEND_COOLDOWN_MS`(120초)와 동일하게 유지 */
 const SEND_CODE_COOLDOWN_SEC = 120;
-const ACCESS_TOKEN_KEY = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY;
-const AUTH_USER_KEY = process.env.NEXT_PUBLIC_AUTH_USER_KEY;
 const TARGET_CERT_NONE = "";
 const AWS_CERTIFICATION_OPTIONS = [
   "SAA-C03",
@@ -70,7 +73,7 @@ export default function SignupPage() {
     setVerificationMessage("");
     setIsEmailVerified(false);
 
-    if (!API_BASE_URL) {
+    if (!isApiConfigured()) {
       setError("프론트 환경변수(.env) 설정을 확인해주세요.");
       return;
     }
@@ -81,23 +84,7 @@ export default function SignupPage() {
 
     setSendingCode(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/email/send-code`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        if (response.status === 429 && typeof data?.message === "string") {
-          const m = data.message.match(/약 (\d+)초/);
-          if (m) {
-            setSendCooldownLeft(Math.min(SEND_CODE_COOLDOWN_SEC, Math.max(1, parseInt(m[1], 10))));
-          }
-        }
-        throw new Error(
-          Array.isArray(data?.message) ? data.message.join(", ") : (data?.message ?? "인증코드 발송 실패"),
-        );
-      }
+      const data = await authApi.sendEmailCode(email);
       setCodeSent(true);
       setSendCooldownLeft(SEND_CODE_COOLDOWN_SEC);
       setVerificationMessage(
@@ -106,7 +93,16 @@ export default function SignupPage() {
           : (data?.message ?? "인증코드 발송 완료"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "인증코드 발송 중 오류가 발생했습니다.");
+      if (isAxiosError(err) && err.response?.status === 429) {
+        const message = getApiErrorMessage(err);
+        const m = message.match(/약 (\d+)초/);
+        if (m) {
+          setSendCooldownLeft(
+            Math.min(SEND_CODE_COOLDOWN_SEC, Math.max(1, parseInt(m[1], 10))),
+          );
+        }
+      }
+      setError(getApiErrorMessage(err, "인증코드 발송 중 오류가 발생했습니다."));
     } finally {
       setSendingCode(false);
     }
@@ -116,7 +112,7 @@ export default function SignupPage() {
     setError("");
     setVerificationMessage("");
 
-    if (!API_BASE_URL) {
+    if (!isApiConfigured()) {
       setError("프론트 환경변수(.env) 설정을 확인해주세요.");
       return;
     }
@@ -131,20 +127,12 @@ export default function SignupPage() {
 
     setVerifyingCode(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/email/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: verificationCode }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message ?? "이메일 인증 실패");
-      }
+      const data = await authApi.verifyEmailCode(email, verificationCode);
       setIsEmailVerified(Boolean(data?.verified));
       setVerificationMessage("이메일 인증이 완료되었습니다.");
     } catch (err) {
       setIsEmailVerified(false);
-      setError(err instanceof Error ? err.message : "이메일 인증 중 오류가 발생했습니다.");
+      setError(getApiErrorMessage(err, "이메일 인증 중 오류가 발생했습니다."));
     } finally {
       setVerifyingCode(false);
     }
@@ -155,7 +143,7 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
 
-    if (!API_BASE_URL || !ACCESS_TOKEN_KEY || !AUTH_USER_KEY) {
+    if (!isAuthStorageConfigured()) {
       setError("프론트 환경변수(.env) 설정을 확인해주세요.");
       setLoading(false);
       return;
@@ -172,29 +160,17 @@ export default function SignupPage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          targetCertificationType: targetCertificationType || null,
-        }),
+      const data = await authApi.signup({
+        name,
+        email,
+        password,
+        targetCertificationType: targetCertificationType || null,
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message ?? "회원가입에 실패했습니다.");
-      }
-
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-      notifyAuthStorageChanged();
+      saveAuthSession(data);
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.");
+      setError(getApiErrorMessage(err, "회원가입 중 오류가 발생했습니다."));
     } finally {
       setLoading(false);
     }
