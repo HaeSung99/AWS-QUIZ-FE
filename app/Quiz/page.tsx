@@ -120,7 +120,7 @@ function QuizPageContent() {
         setMessage(getApiErrorMessage(e, "문제 조회 실패"));
       }
     })();
-  }, [token, workbookId, category, isRecommendedMode, isDailyMode]);
+  }, [workbookId, category, isRecommendedMode, isDailyMode]);
 
   const currentQuestion = useMemo(
     () => (questions.length > 0 ? questions[currentIndex] : null),
