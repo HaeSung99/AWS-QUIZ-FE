@@ -8,7 +8,9 @@ import {
   publicApi,
   userApi,
   type QuizQuestion,
+  type ReviewItem,
 } from "@/lib/api";
+import { WorkbookReviewItems } from "@/components/workbook-review-items";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -41,18 +43,30 @@ const defaultReveal: QuestionInfoReveal = {
   hint: false,
 };
 
-function choiceIndexAndText(
-  choices: string[],
-  answer: string | null,
-): { num: number | null; text: string } {
-  if (answer == null || answer === "") {
-    return { num: null, text: "" };
-  }
-  const idx = choices.findIndex((c) => c === answer);
-  if (idx < 0) {
-    return { num: null, text: answer };
-  }
-  return { num: idx + 1, text: answer };
+function scrollToReviewItem(questionId: string) {
+  document
+    .getElementById(`quiz-review-item-${questionId}`)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function buildReviewItemsFromResult(
+  resultItems: QuizResultItem[],
+  questionById: Map<string, QuizQuestion>,
+): ReviewItem[] {
+  return resultItems.map((item) => {
+    const q = questionById.get(item.questionId);
+    return {
+      questionId: item.questionId,
+      questionNumber: item.questionNumber,
+      questionDescription: q?.questionDescription ?? "",
+      choices: q?.choices ?? [],
+      difficulty: q?.difficulty ?? "미지정",
+      questionCategory: q?.questionCategory ?? "미분류",
+      selectedAnswer: item.selectedAnswer,
+      correctAnswer: item.correctAnswer,
+      isCorrect: item.isCorrect,
+    };
+  });
 }
 
 function subscribeAuthToken(onStoreChange: () => void) {
@@ -150,6 +164,16 @@ function QuizPageContent() {
     });
   };
 
+  const reviewItems = useMemo(
+    () => buildReviewItemsFromResult(resultItems, questionById),
+    [resultItems, questionById],
+  );
+
+  const resultAccuracy = useMemo(() => {
+    if (!result || result.total === 0) return 0;
+    return Number(((result.score / result.total) * 100).toFixed(1));
+  }, [result]);
+
   const unansweredCount = useMemo(
     () => questions.reduce((n, q) => (answers[q.id] ? n : n + 1), 0),
     [questions, answers],
@@ -246,14 +270,6 @@ function QuizPageContent() {
     }
   };
 
-  const onGoToQuestionFromResult = (questionId: string) => {
-    const idx = questions.findIndex((q) => q.id === questionId);
-    if (idx < 0) return;
-    setCurrentIndex(idx);
-    setSubmitted(false);
-    setMessage("");
-  };
-
   if (!token) {
     return (
       <main className="min-h-screen bg-black text-neutral-100 flex flex-col items-center justify-center px-4">
@@ -307,8 +323,8 @@ function QuizPageContent() {
                 <button
                   key={item.questionId}
                   type="button"
-                  title="클릭하면 해당 문제로 이동"
-                  onClick={() => onGoToQuestionFromResult(item.questionId)}
+                  title="클릭하면 아래 채점 상세로 이동"
+                  onClick={() => scrollToReviewItem(item.questionId)}
                   className={`rounded-lg border-2 px-2 py-2 text-sm font-medium shadow-sm transition hover:brightness-110 ${
                     item.isCorrect
                       ? "border-emerald-400/70 bg-emerald-950/50 text-emerald-100"
@@ -320,114 +336,25 @@ function QuizPageContent() {
               ))}
             </div>
 
-            <ul className="mt-6 space-y-4">
-              {resultItems.map((item) => {
-                const q = questionById.get(item.questionId);
-                const choices = q?.choices ?? [];
-                const mine = choiceIndexAndText(choices, item.selectedAnswer);
-                const correct = choiceIndexAndText(choices, item.correctAnswer);
-                const mineMissingIdx =
-                  item.selectedAnswer != null &&
-                  item.selectedAnswer !== "" &&
-                  mine.num == null;
-                const correctMissingIdx =
-                  item.correctAnswer != null &&
-                  item.correctAnswer !== "" &&
-                  correct.num == null;
-
-                return (
-                  <li
-                    key={`detail-${item.questionId}`}
-                    className="rounded-xl border border-neutral-600/90 bg-neutral-950/70 p-4 shadow-md ring-1 ring-white/5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p
-                        className={`text-base font-semibold ${
-                          item.isCorrect ? "text-emerald-300" : "text-rose-300"
-                        }`}
-                      >
-                        {item.questionNumber}번 ·{" "}
-                        {item.isCorrect ? "정답" : "오답"}
-                      </p>
-                      {!item.isCorrect ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onGoToQuestionFromResult(item.questionId)
-                          }
-                          className="cursor-pointer rounded-lg border-2 border-rose-400/60 bg-rose-950/40 px-3 py-1.5 text-xs font-medium text-rose-100 transition hover:border-rose-300 hover:bg-rose-900/50"
-                        >
-                          해당 문제로 바로가기
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div
-                        className={`rounded-lg border-2 px-3 py-3 ${
-                          item.isCorrect
-                            ? "border-emerald-500/45 bg-emerald-950/35"
-                            : "border-rose-500/50 bg-rose-950/35"
-                        }`}
-                      >
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-300">
-                          내 응답
-                        </p>
-                        {mine.num == null &&
-                        (item.selectedAnswer == null ||
-                          item.selectedAnswer === "") ? (
-                          <p className="mt-2 text-sm font-medium text-neutral-400">
-                            미응답
-                          </p>
-                        ) : (
-                          <>
-                            <p
-                              className={`mt-2 text-lg font-bold tabular-nums ${
-                                item.isCorrect
-                                  ? "text-emerald-200"
-                                  : "text-rose-200"
-                              }`}
-                            >
-                              {mine.num != null
-                                ? `${mine.num}번`
-                                : "보기 번호 없음"}
-                            </p>
-                            <p className="mt-1.5 text-sm leading-relaxed text-neutral-100">
-                              {mine.text}
-                            </p>
-                            {mineMissingIdx ? (
-                              <p className="mt-2 text-xs text-amber-200/90">
-                                현재 선택지 목록과 문자열이 일치하지 않습니다.
-                                (데이터 불일치 가능)
-                              </p>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border-2 border-emerald-500/50 bg-emerald-950/35 px-3 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200/90">
-                          정답
-                        </p>
-                        <p className="mt-2 text-lg font-bold tabular-nums text-emerald-100">
-                          {correct.num != null
-                            ? `${correct.num}번`
-                            : "보기 번호 없음"}
-                        </p>
-                        <p className="mt-1.5 text-sm leading-relaxed text-neutral-50">
-                          {correct.text}
-                        </p>
-                        {correctMissingIdx ? (
-                          <p className="mt-2 text-xs text-amber-200/90">
-                            정답 문자열이 선택지와 일치하지 않습니다.
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900/50">
+              <div className="border-b border-neutral-800 px-4 py-3">
+                <h2 className="text-sm font-semibold text-neutral-200">
+                  채점 상세
+                </h2>
+                {result ? (
+                  <p className="mt-1 text-xs text-neutral-400">
+                    이번 제출 · {result.score}/{result.total} 문항 정답 (
+                    {resultAccuracy}%)
+                  </p>
+                ) : null}
+              </div>
+              <div className="px-4 py-4">
+                <WorkbookReviewItems
+                  items={reviewItems}
+                  itemIdPrefix="quiz-review-item"
+                />
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-lg border border-neutral-700 bg-neutral-900/60 p-6">
@@ -553,12 +480,8 @@ function QuizPageContent() {
                     제출 확인
                   </h2>
                   <p className="mt-3 text-sm leading-relaxed text-neutral-300">
-                    이대로 제출하시겠습니까? 제출 후에는 채점 결과에서 문제로
-                    돌아가 답을 고칠 수 있지만, 화면에 보이는 점수는{" "}
-                    <span className="font-medium text-neutral-100">
-                      이번 제출 시점
-                    </span>{" "}
-                    기준입니다.
+                    이대로 제출하시겠습니까? 제출 후에는 아래 채점 상세에서
+                    문항별 정오답과 해설을 확인할 수 있습니다.
                   </p>
                   <p className="mt-3 rounded-lg border border-sky-500/40 bg-sky-950/30 px-3 py-2 text-sm font-medium text-sky-100">
                     최초 제출만 정답률로 집계됩니다.

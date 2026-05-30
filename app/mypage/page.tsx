@@ -12,6 +12,7 @@ import {
   type WorkbookReview,
   type WorkbookAccuracy as WorkbookAccuracyRow,
 } from "@/lib/api";
+import { WorkbookReviewItems } from "@/components/workbook-review-items";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AUTH_USER_KEY, getAccessToken, getRefreshToken, notifyAuthStorageChanged } from "@/lib/auth-client";
@@ -43,16 +44,6 @@ const AWS_CERTIFICATION_LABELS: Record<string, string> = {
   "DEA-C01": "DEA-C01 - Data Engineer Associate",
   "AIF-C01": "AIF-C01 - AI Practitioner",
 };
-
-function formatChoiceLine(
-  choices: string[],
-  answer: string | null | undefined,
-): string {
-  if (answer === null || answer === undefined || answer === "") return "미응답";
-  const idx = choices.findIndex((c) => c === answer);
-  if (idx < 0) return answer;
-  return `${idx + 1}. ${answer}`;
-}
 
 export default function MyPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -549,65 +540,10 @@ export default function MyPage() {
                             </span>
                           </summary>
                           <div className="border-t border-neutral-800 px-3 py-3">
-                            <ul className="flex flex-col gap-3">
-                              {sess.items
-                                .slice()
-                                .sort((a, b) => a.questionNumber - b.questionNumber)
-                                .map((item) => (
-                                  <li
-                                    key={`${sess.submittedAt}-${item.questionId}`}
-                                    className="rounded-lg border border-neutral-800/80 bg-black/40 p-3"
-                                  >
-                                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                                      <span className="tabular-nums text-neutral-500">
-                                        문항 #{item.questionNumber}
-                                      </span>
-                                      <span
-                                        className={
-                                          item.isCorrect
-                                            ? "font-semibold text-emerald-400"
-                                            : "font-semibold text-rose-400"
-                                        }
-                                      >
-                                        {item.isCorrect ? "정답" : "오답"}
-                                      </span>
-                                      <span className="text-neutral-600">
-                                        {item.questionCategory}
-                                      </span>
-                                      <span className="text-neutral-600">
-                                        · 난이도 {item.difficulty}
-                                      </span>
-                                    </div>
-                                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-neutral-100">
-                                      {item.questionDescription}
-                                    </p>
-                                    <dl className="mt-3 space-y-1.5 text-[11px]">
-                                      <div>
-                                        <dt className="text-neutral-500">
-                                          선택한 보기
-                                        </dt>
-                                        <dd className="text-neutral-200">
-                                          {formatChoiceLine(
-                                            item.choices,
-                                            item.selectedAnswer,
-                                          )}
-                                        </dd>
-                                      </div>
-                                      <div>
-                                        <dt className="text-neutral-500">
-                                          정답
-                                        </dt>
-                                        <dd className="font-medium text-emerald-300">
-                                          {formatChoiceLine(
-                                            item.choices,
-                                            item.correctAnswer,
-                                          )}
-                                        </dd>
-                                      </div>
-                                    </dl>
-                                  </li>
-                                ))}
-                            </ul>
+                            <WorkbookReviewItems
+                              items={sess.items}
+                              itemIdPrefix={`review-${sess.submittedAt}`}
+                            />
                           </div>
                         </details>
                       );
