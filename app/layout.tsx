@@ -115,9 +115,14 @@ export default function RootLayout({
         />
         <AuthSessionValidator />
         <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-neutral-800 bg-black/90 px-4 py-3 backdrop-blur-sm">
-          <Link href="/" className="text-base font-semibold text-neutral-100 transition hover:text-sky-300">
-            AWS Quiz KR
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-base font-semibold text-neutral-100 transition hover:text-sky-300">
+              AWS Quiz KR
+            </Link>
+            <Link href="/pass-certifications" className="text-sm font-medium text-neutral-300 transition hover:text-sky-300">
+              합격 인증
+            </Link>
+          </div>
           <div className="flex items-center gap-2">
             <HeaderAuth />
           </div>
